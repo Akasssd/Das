@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -7,6 +8,9 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '../navigation';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { addDays, parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
@@ -236,26 +240,73 @@ export const TodayScreen: React.FC = () => {
     return formatDayMonth(target, monthsGen);
   })();
 
-  if (!predictions.lastPeriodStart) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <WaveBackground colors={colors} />
-        <ScrollView contentContainerStyle={styles.scroll}>
-          <View style={styles.headerWrap}>
-            <Text style={[styles.headerLabel, { fontFamily: SERIF }]}>
-              {t('today.header')}
-            </Text>
-            <View style={styles.divider} />
-          </View>
-          <View style={styles.dateBlock}>
-            <Text style={[styles.bigDate, { fontFamily: SERIF }]}>{dateStr}</Text>
-            <Text style={styles.cycleDay}>{t('today.noCycle')}</Text>
-            <Text style={styles.phaseLabel}>{t('today.noCycleHint')}</Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
+  const isEmpty = !predictions.lastPeriodStart;
+
+  return (
+    <TodayInner
+      isEmpty={isEmpty}
+      dateStr={dateStr}
+      cycleDay={cycleDay}
+      phase={phase}
+      cycleLen={cycleLen}
+      segments={segments}
+      ringSize={ringSize}
+      renderCenter={renderCenter}
+      untilPeriodValue={untilPeriodValue}
+      fertileValue={fertileValue}
+      nextOvulationValue={nextOvulationValue}
+      colors={colors}
+      styles={styles}
+      t={t}
+      insets={insets}
+    />
+  );
+};
+
+interface TodayInnerProps {
+  isEmpty: boolean;
+  dateStr: string;
+  cycleDay: number | null;
+  phase: CyclePhase;
+  cycleLen: number;
+  segments: ReturnType<typeof buildPhaseSegments>;
+  ringSize: number;
+  renderCenter: () => React.ReactNode;
+  untilPeriodValue: string;
+  fertileValue: string;
+  nextOvulationValue: string;
+  colors: ThemeColors;
+  styles: ReturnType<typeof makeStyles>;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  insets: { top: number; right: number; bottom: number; left: number };
+}
+
+const TodayInner: React.FC<TodayInnerProps> = ({
+  isEmpty,
+  dateStr,
+  cycleDay,
+  phase,
+  cycleLen,
+  segments,
+  ringSize,
+  renderCenter,
+  untilPeriodValue,
+  fertileValue,
+  nextOvulationValue,
+  colors,
+  styles,
+  t,
+  insets,
+}) => {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const dash = t('today.placeholderValue');
+  const showCycleDay = !isEmpty && cycleDay !== null;
+  const phaseText = isEmpty ? t('today.placeholderPhase') : t(phaseTitleKey(phase));
+  const cardUntil = isEmpty ? dash : untilPeriodValue;
+  const cardFertile = isEmpty ? dash : fertileValue;
+  const cardOvulation = isEmpty ? dash : nextOvulationValue;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -277,20 +328,20 @@ export const TodayScreen: React.FC = () => {
         <View style={styles.dateBlock}>
           <Text style={[styles.bigDate, { fontFamily: SERIF }]}>{dateStr}</Text>
           <View style={styles.subDivider} />
-          {cycleDay !== null && (
+          {showCycleDay && cycleDay !== null && (
             <Text style={styles.cycleDay}>
               {t('today.cycleDay', { n: cycleDay })}
             </Text>
           )}
-          <Text style={styles.phaseLabel}>{t(phaseTitleKey(phase))}</Text>
+          <Text style={styles.phaseLabel}>{phaseText}</Text>
         </View>
 
         <View style={styles.ringWrap}>
           <PhaseRing
             size={ringSize}
             cycleLen={cycleLen}
-            cycleDay={cycleDay}
-            segments={segments}
+            cycleDay={isEmpty ? null : cycleDay}
+            segments={isEmpty ? [] : segments}
             colors={colors}
           >
             {renderCenter()}
@@ -302,24 +353,36 @@ export const TodayScreen: React.FC = () => {
             colors={colors}
             icon={<DropIcon size={28} colors={colors} />}
             label={t('today.cardUntilPeriod')}
-            value={untilPeriodValue}
+            value={cardUntil}
             serif={SERIF}
           />
           <InfoCard
             colors={colors}
             icon={<HeartIcon size={28} colors={colors} />}
             label={t('today.cardFertileWindow')}
-            value={fertileValue}
+            value={cardFertile}
             serif={SERIF}
           />
           <InfoCard
             colors={colors}
             icon={<CalendarIcon size={28} colors={colors} />}
             label={t('today.cardNextOvulation')}
-            value={nextOvulationValue}
+            value={cardOvulation}
             serif={SERIF}
           />
         </View>
+
+        {isEmpty ? (
+          <View style={styles.ctaWrap}>
+            <Pressable
+              style={styles.ctaBtn}
+              onPress={() => navigation.navigate('CycleWizard')}
+            >
+              <Text style={styles.ctaBtnText}>{t('today.setupCta')}</Text>
+            </Pressable>
+            <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
+          </View>
+        ) : null}
 
         <View style={{ height: 24 }} />
       </ScrollView>
@@ -455,5 +518,35 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.text,
       fontWeight: '500',
       textAlign: 'center',
+    },
+    ctaWrap: {
+      width: '100%',
+      alignItems: 'center',
+      marginTop: 18,
+    },
+    ctaBtn: {
+      backgroundColor: colors.primary,
+      paddingVertical: 14,
+      paddingHorizontal: 28,
+      borderRadius: 999,
+      shadowColor: '#000',
+      shadowOpacity: 0.08,
+      shadowRadius: 6,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
+    },
+    ctaBtnText: {
+      color: colors.primaryText,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+    },
+    ctaHint: {
+      marginTop: 10,
+      fontSize: 12,
+      color: colors.textMuted,
+      textAlign: 'center',
+      maxWidth: 280,
+      lineHeight: 17,
     },
   });

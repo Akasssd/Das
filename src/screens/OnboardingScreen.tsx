@@ -91,7 +91,8 @@ export const OnboardingScreen: React.FC<Props> = ({
   );
   const [pin, setPin] = useState('');
   const [pin2, setPin2] = useState('');
-  const [lastPeriod, setLastPeriod] = useState<string | null>(null);
+  const [lastPeriodStart, setLastPeriodStart] = useState<string | null>(null);
+  const [lastPeriodEnd, setLastPeriodEnd] = useState<string | null>(null);
   const [periodLen, setPeriodLen] = useState(data.settings.averagePeriodLength);
   const [cycleLen, setCycleLen] = useState(data.settings.averageCycleLength);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -115,9 +116,20 @@ export const OnboardingScreen: React.FC<Props> = ({
         averagePeriodLength: periodLen,
         averageCycleLength: cycleLen,
       });
-      if (lastPeriod) {
-        // Mark last period day as flow=medium so predictions kick in.
-        await upsertLog({ date: lastPeriod, flow: 'medium' });
+      if (lastPeriodStart) {
+        // Mark every day of the chosen period range as flow=medium so
+        // predictions and the calendar show the full bleed window.
+        const startD = parseISO(lastPeriodStart);
+        const endD = lastPeriodEnd ? parseISO(lastPeriodEnd) : startD;
+        const days = Math.max(
+          0,
+          Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)),
+        );
+        for (let i = 0; i <= days; i += 1) {
+          const d = new Date(startD);
+          d.setDate(d.getDate() + i);
+          await upsertLog({ date: format(d, 'yyyy-MM-dd'), flow: 'medium' });
+        }
       }
       await setOnboardingDone(true);
       onComplete();
@@ -149,6 +161,8 @@ export const OnboardingScreen: React.FC<Props> = ({
     switch (step) {
       case 'name':
         return name.trim().length > 0;
+      case 'lastPeriod':
+        return Boolean(lastPeriodStart);
       case 'birthdate':
         // Birthdate is optional but if any field set, all must be set & valid
         if (!birthYear && !birthMonth && !birthDay) return true;
@@ -165,8 +179,6 @@ export const OnboardingScreen: React.FC<Props> = ({
         );
       case 'pin':
         return true; // pin is optional; if filled, validation runs in goNext
-      case 'lastPeriod':
-        return Boolean(lastPeriod);
       default:
         return true;
     }
@@ -270,15 +282,50 @@ export const OnboardingScreen: React.FC<Props> = ({
             <Text style={styles.stepHint}>
               {t('onboarding.lastPeriodHint')}
             </Text>
+            <RangeSummary
+              colors={colors}
+              fromLabel={t('onboarding.rangeFrom')}
+              toLabel={t('onboarding.rangeTo')}
+              durationLabel={t('onboarding.rangeDuration')}
+              resetLabel={t('onboarding.rangeReset')}
+              suffix={t('onboarding.daysSuffix')}
+              start={lastPeriodStart}
+              end={lastPeriodEnd}
+              onReset={() => {
+                setLastPeriodStart(null);
+                setLastPeriodEnd(null);
+              }}
+            />
             <MiniCalendar
               colors={colors}
               monthOffset={monthOffset}
               onChangeMonthOffset={setMonthOffset}
-              selected={lastPeriod}
-              onSelect={setLastPeriod}
-              onPickToday={() => {
-                setMonthOffset(0);
-                setLastPeriod(format(new Date(), 'yyyy-MM-dd'));
+              rangeStart={lastPeriodStart}
+              rangeEnd={lastPeriodEnd}
+              onRangePick={(iso) => {
+                if (!lastPeriodStart || (lastPeriodStart && lastPeriodEnd)) {
+                  setLastPeriodStart(iso);
+                  setLastPeriodEnd(null);
+                  // Pre-set period length to 1 day until end is picked
+                  setPeriodLen(1);
+                  return;
+                }
+                // Picking the end
+                if (parseISO(iso).getTime() < parseISO(lastPeriodStart).getTime()) {
+                  // If user taps before start, treat tapped as new start
+                  setLastPeriodStart(iso);
+                  setLastPeriodEnd(null);
+                  setPeriodLen(1);
+                  return;
+                }
+                setLastPeriodEnd(iso);
+                const days =
+                  Math.round(
+                    (parseISO(iso).getTime() -
+                      parseISO(lastPeriodStart).getTime()) /
+                      (1000 * 60 * 60 * 24),
+                  ) + 1;
+                setPeriodLen(Math.min(10, Math.max(2, days)));
               }}
             />
           </View>
@@ -422,14 +469,29 @@ const buildMonthGrid = (anchor: Date): (Date | null)[] => {
   return cells;
 };
 
-const MiniCalendar: React.FC<{
+interface MiniCalendarProps {
   colors: ThemeColors;
   monthOffset: number;
   onChangeMonthOffset: (n: number) => void;
-  selected: string | null;
-  onSelect: (iso: string) => void;
+  selected?: string | null;
+  onSelect?: (iso: string) => void;
   onPickToday?: () => void;
-}> = ({ colors, monthOffset, onChangeMonthOffset, selected, onSelect, onPickToday }) => {
+  rangeStart?: string | null;
+  rangeEnd?: string | null;
+  onRangePick?: (iso: string) => void;
+}
+
+const MiniCalendar: React.FC<MiniCalendarProps> = ({
+  colors,
+  monthOffset,
+  onChangeMonthOffset,
+  selected,
+  onSelect,
+  onPickToday,
+  rangeStart,
+  rangeEnd,
+  onRangePick,
+}) => {
   const { t } = useApp();
   const todayLabel = t('onboarding.pickToday');
   const styles = makeStyles(colors);
@@ -440,6 +502,13 @@ const MiniCalendar: React.FC<{
   const weekdays = tArray('weekdays');
   const monthLabel = `${months[anchor.getMonth()] ?? ''} ${anchor.getFullYear()}`;
   const selectedDate = selected ? parseISO(selected) : null;
+  const rangeStartDate = rangeStart ? parseISO(rangeStart) : null;
+  const rangeEndDate = rangeEnd ? parseISO(rangeEnd) : null;
+  const isRangeMode = Boolean(onRangePick);
+  const sameDay = (a: Date, b: Date) =>
+    a.getDate() === b.getDate() &&
+    a.getMonth() === b.getMonth() &&
+    a.getFullYear() === b.getFullYear();
   return (
     <View style={styles.calBox}>
       <View style={styles.calHeader}>
@@ -486,18 +555,35 @@ const MiniCalendar: React.FC<{
           if (!d) return <View key={`e${i}`} style={styles.calCellEmpty} />;
           const iso = format(d, 'yyyy-MM-dd');
           const isFuture = isAfter(d, today);
+          const isSingleSelected =
+            !isRangeMode && selectedDate && sameDay(d, selectedDate);
+          const isRangeStart =
+            isRangeMode && rangeStartDate && sameDay(d, rangeStartDate);
+          const isRangeEnd =
+            isRangeMode && rangeEndDate && sameDay(d, rangeEndDate);
+          const isInRange =
+            isRangeMode &&
+            rangeStartDate &&
+            rangeEndDate &&
+            d.getTime() > rangeStartDate.getTime() &&
+            d.getTime() < rangeEndDate.getTime();
           const isSelected =
-            selectedDate &&
-            d.getDate() === selectedDate.getDate() &&
-            d.getMonth() === selectedDate.getMonth() &&
-            d.getFullYear() === selectedDate.getFullYear();
+            isSingleSelected || isRangeStart || isRangeEnd;
+          const onPress = () => {
+            if (isRangeMode) onRangePick?.(iso);
+            else onSelect?.(iso);
+          };
           return (
             <Pressable
               key={iso}
               disabled={isFuture}
-              onPress={() => onSelect(iso)}
+              onPress={onPress}
               style={[
                 styles.calCell,
+                isInRange && {
+                  backgroundColor: colors.fertile,
+                  borderColor: colors.fertile,
+                },
                 isSelected && {
                   backgroundColor: colors.period,
                   borderColor: colors.period,
@@ -508,6 +594,7 @@ const MiniCalendar: React.FC<{
               <Text
                 style={[
                   styles.calCellText,
+                  isInRange && { color: colors.text, fontWeight: '600' },
                   isSelected && { color: colors.primaryText, fontWeight: '700' },
                 ]}
               >
@@ -521,6 +608,77 @@ const MiniCalendar: React.FC<{
         <Pressable style={styles.todayBtn} onPress={onPickToday}>
           <Text style={styles.todayBtnText}>{todayLabel}</Text>
         </Pressable>
+      ) : null}
+    </View>
+  );
+};
+
+const RangeSummary: React.FC<{
+  colors: ThemeColors;
+  fromLabel: string;
+  toLabel: string;
+  durationLabel: string;
+  resetLabel: string;
+  suffix: string;
+  start: string | null;
+  end: string | null;
+  onReset: () => void;
+}> = ({
+  colors,
+  fromLabel,
+  toLabel,
+  durationLabel,
+  resetLabel,
+  suffix,
+  start,
+  end,
+  onReset,
+}) => {
+  const styles = makeStyles(colors);
+  const months = tArray('monthsGenitive');
+  const fmt = (iso: string | null) => {
+    if (!iso) return '—';
+    const d = parseISO(iso);
+    return `${d.getDate()} ${months[d.getMonth()] ?? ''}`;
+  };
+  const days =
+    start && end
+      ? Math.max(
+          1,
+          Math.round(
+            (parseISO(end).getTime() - parseISO(start).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ) + 1,
+        )
+      : start
+        ? 1
+        : 0;
+  return (
+    <View style={styles.rangeBox}>
+      <View style={styles.rangeRow}>
+        <View style={styles.rangeCell}>
+          <Text style={styles.rangeCellLabel}>{fromLabel}</Text>
+          <Text style={styles.rangeCellValue}>{fmt(start)}</Text>
+        </View>
+        <View style={styles.rangeArrow}>
+          <Text style={styles.rangeArrowText}>→</Text>
+        </View>
+        <View style={styles.rangeCell}>
+          <Text style={styles.rangeCellLabel}>{toLabel}</Text>
+          <Text style={styles.rangeCellValue}>{fmt(end)}</Text>
+        </View>
+      </View>
+      {days > 0 ? (
+        <View style={styles.rangeFooter}>
+          <Text style={styles.rangeDuration}>
+            {durationLabel}: {days} {suffix}
+          </Text>
+          {start ? (
+            <Pressable onPress={onReset}>
+              <Text style={styles.rangeReset}>{resetLabel}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -845,5 +1003,58 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: 2,
       textTransform: 'uppercase',
       letterSpacing: 0.5,
+    },
+    rangeBox: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+    },
+    rangeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    rangeCell: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    rangeCellLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginBottom: 4,
+    },
+    rangeCellValue: {
+      fontSize: 18,
+      color: colors.text,
+      fontFamily: SERIF,
+    },
+    rangeArrow: {
+      paddingHorizontal: 8,
+    },
+    rangeArrowText: {
+      color: colors.primary,
+      fontSize: 18,
+    },
+    rangeFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    rangeDuration: {
+      fontSize: 13,
+      color: colors.textMuted,
+    },
+    rangeReset: {
+      fontSize: 13,
+      color: colors.primary,
+      fontWeight: '600',
     },
   });
