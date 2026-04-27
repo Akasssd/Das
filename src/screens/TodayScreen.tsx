@@ -20,6 +20,20 @@ import {
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
 
+const ruDayWord = (n: number): string => {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return 'дней';
+  if (b > 1 && b < 5) return 'дня';
+  if (b === 1) return 'день';
+  return 'дней';
+};
+
+const formatDays = (n: number, language: string): string => {
+  if (language === 'ru') return `${n} ${ruDayWord(n)}`;
+  return n === 1 ? `${n} day` : `${n} days`;
+};
+
 const SERIF =
   // Stack of warm, elegant serifs that work on iOS, Android and the web build.
   'Cochin, "Hoefler Text", "Times New Roman", Georgia, serif';
@@ -217,18 +231,21 @@ export const TodayScreen: React.FC = () => {
     const days = predictions.daysUntilNextPeriod;
     if (days === null) return '—';
     if (days === 0) return t('today.cardUntilPeriodNow');
-    if (days < 0) return t('today.cardUntilPeriodLate', { n: Math.abs(days) });
-    return t('today.valueDaysFull', { n: days });
+    if (days < 0) {
+      return language === 'ru'
+        ? `Задержка ${formatDays(Math.abs(days), 'ru')}`
+        : `Late ${formatDays(Math.abs(days), 'en')}`;
+    }
+    return formatDays(days, language);
   })();
 
   const fertileValue = (() => {
     if (predictions.lastPeriodStart === null) return '—';
     if (fertile.isInside) {
-      return t('today.valueDaysFull', { n: fertile.remaining });
+      return formatDays(fertile.remaining, language);
     }
     if (fertile.total === 0) return '—';
     if (cycleDay !== null) {
-      // Compute days until next fertile window
       const nextStart = predictions.fertileStart
         ? parseISO(predictions.fertileStart)
         : null;
@@ -237,12 +254,14 @@ export const TodayScreen: React.FC = () => {
           (nextStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
         );
         if (diff > 0) {
-          return t('today.fertileStartsIn', { n: diff });
+          return language === 'ru'
+            ? `через ${formatDays(diff, 'ru')}`
+            : `in ${formatDays(diff, 'en')}`;
         }
       }
       return t('today.fertileEnded');
     }
-    return t('today.valueDaysFull', { n: fertile.total });
+    return formatDays(fertile.total, language);
   })();
 
   const nextOvulationValue = (() => {
