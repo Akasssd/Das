@@ -134,9 +134,9 @@ const dayCellStyle = (
   if (markers.includes('predictedPeriod')) {
     return {
       backgroundColor: 'transparent',
-      borderColor: colors.predictedPeriod,
-      borderWidth: 1.5,
-      borderStyle: 'dashed' as const,
+      borderColor: '#D64545',
+      borderWidth: 2,
+      borderRadius: 999,
     };
   }
   if (markers.includes('fertile')) {
@@ -156,6 +156,9 @@ const dayTextStyle = (
   if (markers.includes('period')) {
     return { color: colors.primaryText, fontWeight: '700' as const };
   }
+  if (markers.includes('predictedPeriod')) {
+    return { color: '#D64545', fontWeight: '700' as const };
+  }
   if (markers.includes('fertile')) {
     return { color: colors.text, fontWeight: '600' as const };
   }
@@ -174,7 +177,7 @@ const Legend: React.FC<LegendProps> = ({ colors, t }) => {
   const styles = makeStyles(colors);
   const items = [
     { color: colors.period, label: t('home.lastPeriod') },
-    { color: colors.predictedPeriod, label: t('home.nextPeriod'), dashed: true },
+    { color: '#D64545', label: t('home.nextPeriod'), ring: true },
     { color: colors.fertile, label: t('home.fertileWindow') },
     { color: colors.ovulation, label: t('home.ovulation') },
   ];
@@ -186,10 +189,10 @@ const Legend: React.FC<LegendProps> = ({ colors, t }) => {
             style={[
               styles.legendSwatch,
               {
-                backgroundColor: it.dashed ? 'transparent' : it.color,
+                backgroundColor: it.ring ? 'transparent' : it.color,
                 borderColor: it.color,
-                borderStyle: it.dashed ? 'dashed' : 'solid',
-                borderWidth: it.dashed ? 1.5 : 0,
+                borderWidth: it.ring ? 2 : 0,
+                borderRadius: 999,
               },
             ]}
           />

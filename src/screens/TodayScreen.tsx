@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,9 +7,6 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../navigation';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { addDays, parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
@@ -298,9 +294,6 @@ const TodayInner: React.FC<TodayInnerProps> = ({
   t,
   insets,
 }) => {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
   const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
   const phaseText = isEmpty ? t('today.placeholderPhase') : t(phaseTitleKey(phase));
@@ -374,12 +367,6 @@ const TodayInner: React.FC<TodayInnerProps> = ({
 
         {isEmpty ? (
           <View style={styles.ctaWrap}>
-            <Pressable
-              style={styles.ctaBtn}
-              onPress={() => navigation.navigate('CycleWizard')}
-            >
-              <Text style={styles.ctaBtnText}>{t('today.setupCta')}</Text>
-            </Pressable>
             <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
           </View>
         ) : null}
