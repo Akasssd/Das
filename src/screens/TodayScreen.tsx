@@ -6,7 +6,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { addDays, parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
@@ -143,6 +143,7 @@ const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
 export const TodayScreen: React.FC = () => {
   const { data, predictions, colors, t, language } = useApp();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const today = new Date();
@@ -168,7 +169,7 @@ export const TodayScreen: React.FC = () => {
 
   const fertile = fertileWindowInfo(cycleDay, segments);
 
-  const ringSize = Math.min(width - 64, 320);
+  const ringSize = Math.min(width - 80, 260);
 
   const renderCenter = () => {
     const innerLabel = t(phaseInnerKey(phase));
@@ -260,7 +261,10 @@ export const TodayScreen: React.FC = () => {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <WaveBackground colors={colors} />
       <ScrollView
-        contentContainerStyle={styles.scroll}
+        contentContainerStyle={[
+          styles.scroll,
+          { paddingBottom: 24 + Math.max(insets.bottom, 24) },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerWrap}>
@@ -372,37 +376,37 @@ const makeStyles = (colors: ThemeColors) =>
     },
     dateBlock: {
       alignItems: 'center',
-      marginTop: 12,
-      marginBottom: 16,
+      marginTop: 4,
+      marginBottom: 4,
     },
     bigDate: {
-      fontSize: 56,
+      fontSize: 48,
       color: colors.primary,
       fontWeight: '300',
       letterSpacing: 0.5,
-      marginBottom: 8,
+      marginBottom: 4,
     },
     subDivider: {
       height: 1,
       backgroundColor: colors.border,
       width: 110,
-      marginTop: 10,
-      marginBottom: 10,
+      marginTop: 6,
+      marginBottom: 6,
     },
     cycleDay: {
-      fontSize: 18,
+      fontSize: 16,
       color: colors.textMuted,
       marginBottom: 0,
     },
     phaseLabel: {
-      fontSize: 15,
+      fontSize: 14,
       color: colors.textMuted,
       letterSpacing: 0.6,
       textAlign: 'center',
       paddingHorizontal: 12,
     },
     ringWrap: {
-      marginVertical: 16,
+      marginVertical: 8,
       alignItems: 'center',
     },
     ringCenter: {
