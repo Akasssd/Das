@@ -27,6 +27,7 @@ interface AppContextValue {
   colors: ThemeColors;
   // mutations
   upsertLog: (log: DayLog) => Promise<void>;
+  upsertLogs: (logs: DayLog[]) => Promise<void>;
   removeLog: (date: string) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => Promise<void>;
@@ -89,6 +90,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         delete next.logs[log.date];
       } else {
         next.logs[log.date] = log;
+      }
+      await persist(next);
+    },
+    [data, persist],
+  );
+
+  // Apply many log changes at once. Necessary because the per-call upsertLog
+  // closes over `data` from the current render and would clobber earlier
+  // writes within the same tick (e.g. logging a 7-day period range).
+  const upsertLogs = useCallback(
+    async (logs: DayLog[]) => {
+      const next: AppData = { ...data, logs: { ...data.logs } };
+      for (const log of logs) {
+        if (isLogEmpty(log)) {
+          delete next.logs[log.date];
+        } else {
+          next.logs[log.date] = log;
+        }
       }
       await persist(next);
     },
@@ -172,6 +191,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       predictions,
       colors,
       upsertLog,
+      upsertLogs,
       removeLog,
       updateSettings,
       updateProfile,
@@ -187,6 +207,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       predictions,
       colors,
       upsertLog,
+      upsertLogs,
       removeLog,
       updateSettings,
       updateProfile,

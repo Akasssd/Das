@@ -32,7 +32,7 @@ type Step =
   | 'birthdate'
   | 'pin'
   | 'lastPeriod'
-  | 'periodLength'
+  | 'prevPeriod'
   | 'cycleLength'
   | 'done';
 
@@ -42,7 +42,7 @@ const STEP_ORDER: Step[] = [
   'birthdate',
   'pin',
   'lastPeriod',
-  'periodLength',
+  'prevPeriod',
   'cycleLength',
   'done',
 ];
@@ -63,7 +63,7 @@ export const OnboardingScreen: React.FC<Props> = ({
     colors,
     t,
     data,
-    upsertLog,
+    upsertLogs,
     updateSettings,
     updateProfile,
     setOnboardingDone,
@@ -71,7 +71,7 @@ export const OnboardingScreen: React.FC<Props> = ({
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const steps: Step[] = cycleOnly
-    ? ['lastPeriod', 'periodLength', 'cycleLength', 'done']
+    ? ['lastPeriod', 'prevPeriod', 'cycleLength', 'done']
     : STEP_ORDER;
   const [stepIdx, setStepIdx] = useState(() => {
     if (initialStep) return Math.max(0, steps.indexOf(initialStep));
@@ -93,10 +93,25 @@ export const OnboardingScreen: React.FC<Props> = ({
   const [pin2, setPin2] = useState('');
   const [lastPeriodStart, setLastPeriodStart] = useState<string | null>(null);
   const [lastPeriodEnd, setLastPeriodEnd] = useState<string | null>(null);
+  const [prevPeriodStart, setPrevPeriodStart] = useState<string | null>(null);
+  const [prevPeriodEnd, setPrevPeriodEnd] = useState<string | null>(null);
   const [periodLen, setPeriodLen] = useState(data.settings.averagePeriodLength);
   const [cycleLen, setCycleLen] = useState(data.settings.averageCycleLength);
   const [monthOffset, setMonthOffset] = useState(0);
+  const [prevMonthOffset, setPrevMonthOffset] = useState(-1);
   const [pinError, setPinError] = useState<string | null>(null);
+
+  // Auto-derive cycle length from prev->last period start gap
+  const derivedCycleLen = useMemo(() => {
+    if (!prevPeriodStart || !lastPeriodStart) return null;
+    const days = Math.round(
+      (parseISO(lastPeriodStart).getTime() -
+        parseISO(prevPeriodStart).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+    if (days < 18 || days > 60) return null;
+    return days;
+  }, [prevPeriodStart, lastPeriodStart]);
 
   const goNext = async () => {
     if (step === 'done') {
@@ -112,24 +127,43 @@ export const OnboardingScreen: React.FC<Props> = ({
           pinHash: pin && pin === pin2 ? hashPin(pin) : data.profile.pinHash,
         });
       }
+      // Derive period length from range if provided
+      let effectivePeriodLen = periodLen;
+      if (lastPeriodStart && lastPeriodEnd) {
+        const days =
+          Math.round(
+            (parseISO(lastPeriodEnd).getTime() -
+              parseISO(lastPeriodStart).getTime()) /
+              (1000 * 60 * 60 * 24),
+          ) + 1;
+        effectivePeriodLen = Math.min(10, Math.max(2, days));
+      }
+      const effectiveCycleLen = derivedCycleLen ?? cycleLen;
       await updateSettings({
-        averagePeriodLength: periodLen,
-        averageCycleLength: cycleLen,
+        averagePeriodLength: effectivePeriodLen,
+        averageCycleLength: effectiveCycleLen,
       });
-      if (lastPeriodStart) {
-        // Mark every day of the chosen period range as flow=medium so
-        // predictions and the calendar show the full bleed window.
-        const startD = parseISO(lastPeriodStart);
-        const endD = lastPeriodEnd ? parseISO(lastPeriodEnd) : startD;
+      // Build the bleeding logs for both ranges in one batch so writes don't
+      // overwrite each other.
+      const bleedingLogs: { date: string; flow: 'medium' }[] = [];
+      const expandRange = (start: string | null, end: string | null) => {
+        if (!start) return;
+        const s = parseISO(start);
+        const e = end ? parseISO(end) : s;
         const days = Math.max(
           0,
-          Math.round((endD.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24)),
+          Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)),
         );
         for (let i = 0; i <= days; i += 1) {
-          const d = new Date(startD);
+          const d = new Date(s);
           d.setDate(d.getDate() + i);
-          await upsertLog({ date: format(d, 'yyyy-MM-dd'), flow: 'medium' });
+          bleedingLogs.push({ date: format(d, 'yyyy-MM-dd'), flow: 'medium' });
         }
+      };
+      expandRange(prevPeriodStart, prevPeriodEnd);
+      expandRange(lastPeriodStart, lastPeriodEnd);
+      if (bleedingLogs.length > 0) {
+        await upsertLogs(bleedingLogs);
       }
       await setOnboardingDone(true);
       onComplete();
@@ -149,6 +183,13 @@ export const OnboardingScreen: React.FC<Props> = ({
     setStepIdx((i) => Math.min(steps.length - 1, i + 1));
   };
 
+  // When user reaches cycleLength step, prefer the auto-derived value.
+  React.useEffect(() => {
+    if (step === 'cycleLength' && derivedCycleLen !== null) {
+      setCycleLen(derivedCycleLen);
+    }
+  }, [step, derivedCycleLen]);
+
   const goBack = () => setStepIdx((i) => Math.max(0, i - 1));
   const skipPin = () => {
     setPin('');
@@ -163,6 +204,8 @@ export const OnboardingScreen: React.FC<Props> = ({
         return name.trim().length > 0;
       case 'lastPeriod':
         return Boolean(lastPeriodStart);
+      case 'prevPeriod':
+        return true; // optional
       case 'birthdate':
         // Birthdate is optional but if any field set, all must be set & valid
         if (!birthYear && !birthMonth && !birthDay) return true;
@@ -330,23 +373,56 @@ export const OnboardingScreen: React.FC<Props> = ({
             />
           </View>
         );
-      case 'periodLength':
+      case 'prevPeriod':
         return (
           <View>
             <Text style={styles.stepTitle}>
-              {t('onboarding.periodLengthTitle')}
+              {t('onboarding.prevPeriodTitle')}
             </Text>
             <Text style={styles.stepHint}>
-              {t('onboarding.periodLengthHint')}
+              {t('onboarding.prevPeriodHint')}
             </Text>
-            <Counter
-              value={periodLen}
-              min={2}
-              max={10}
-              suffix={t('onboarding.daysSuffix')}
+            <RangeSummary
               colors={colors}
-              onChange={setPeriodLen}
+              fromLabel={t('onboarding.rangeFrom')}
+              toLabel={t('onboarding.rangeTo')}
+              durationLabel={t('onboarding.rangeDuration')}
+              resetLabel={t('onboarding.rangeReset')}
+              suffix={t('onboarding.daysSuffix')}
+              start={prevPeriodStart}
+              end={prevPeriodEnd}
+              onReset={() => {
+                setPrevPeriodStart(null);
+                setPrevPeriodEnd(null);
+              }}
             />
+            <MiniCalendar
+              colors={colors}
+              monthOffset={prevMonthOffset}
+              onChangeMonthOffset={setPrevMonthOffset}
+              maxIso={lastPeriodStart ?? undefined}
+              rangeStart={prevPeriodStart}
+              rangeEnd={prevPeriodEnd}
+              onRangePick={(iso) => {
+                if (lastPeriodStart && iso >= lastPeriodStart) return;
+                if (!prevPeriodStart || (prevPeriodStart && prevPeriodEnd)) {
+                  setPrevPeriodStart(iso);
+                  setPrevPeriodEnd(null);
+                  return;
+                }
+                if (parseISO(iso).getTime() < parseISO(prevPeriodStart).getTime()) {
+                  setPrevPeriodStart(iso);
+                  setPrevPeriodEnd(null);
+                  return;
+                }
+                setPrevPeriodEnd(iso);
+              }}
+            />
+            {derivedCycleLen !== null ? (
+              <Text style={styles.derivedNote}>
+                {t('onboarding.derivedCycle', { n: derivedCycleLen })}
+              </Text>
+            ) : null}
           </View>
         );
       case 'cycleLength':
@@ -356,7 +432,9 @@ export const OnboardingScreen: React.FC<Props> = ({
               {t('onboarding.cycleLengthTitle')}
             </Text>
             <Text style={styles.stepHint}>
-              {t('onboarding.cycleLengthHint')}
+              {derivedCycleLen !== null
+                ? t('onboarding.cycleLengthDerivedHint', { n: derivedCycleLen })
+                : t('onboarding.cycleLengthHint')}
             </Text>
             <Counter
               value={cycleLen}
@@ -479,6 +557,8 @@ interface MiniCalendarProps {
   rangeStart?: string | null;
   rangeEnd?: string | null;
   onRangePick?: (iso: string) => void;
+  /** Disable any date on or after this ISO date. */
+  maxIso?: string;
 }
 
 const MiniCalendar: React.FC<MiniCalendarProps> = ({
@@ -491,6 +571,7 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
   rangeStart,
   rangeEnd,
   onRangePick,
+  maxIso,
 }) => {
   const { t } = useApp();
   const todayLabel = t('onboarding.pickToday');
@@ -554,7 +635,9 @@ const MiniCalendar: React.FC<MiniCalendarProps> = ({
         {cells.map((d, i) => {
           if (!d) return <View key={`e${i}`} style={styles.calCellEmpty} />;
           const iso = format(d, 'yyyy-MM-dd');
-          const isFuture = isAfter(d, today);
+          const isFuture =
+            isAfter(d, today) ||
+            (maxIso ? iso >= maxIso : false);
           const isSingleSelected =
             !isRangeMode && selectedDate && sameDay(d, selectedDate);
           const isRangeStart =
@@ -1055,6 +1138,13 @@ const makeStyles = (colors: ThemeColors) =>
     rangeReset: {
       fontSize: 13,
       color: colors.primary,
+      fontWeight: '600',
+    },
+    derivedNote: {
+      marginTop: 12,
+      fontSize: 13,
+      color: colors.primary,
+      textAlign: 'center',
       fontWeight: '600',
     },
   });
