@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -174,12 +174,48 @@ const RootNavigator: React.FC = () => {
   );
 };
 
+const PhoneFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (Platform.OS !== 'web') return <>{children}</>;
+  return (
+    <View style={frameStyles.outer}>
+      <View style={frameStyles.frame}>{children}</View>
+    </View>
+  );
+};
+
+const frameStyles = StyleSheet.create({
+  outer: {
+    flex: 1,
+    backgroundColor: '#2A1D11',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  frame: {
+    width: '100%',
+    maxWidth: 420,
+    height: '100%',
+    maxHeight: 880,
+    borderRadius: 44,
+    overflow: 'hidden',
+    backgroundColor: '#FBF6EF',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 32,
+    shadowOffset: { width: 0, height: 16 },
+    borderWidth: 8,
+    borderColor: '#1B130C',
+  },
+});
+
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AppProvider>
-          <RootNavigator />
+          <PhoneFrame>
+            <RootNavigator />
+          </PhoneFrame>
         </AppProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
