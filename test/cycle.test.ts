@@ -6,6 +6,9 @@ import {
   computePredictions,
   findPeriodStarts,
   buildDayMarkers,
+  buildPhaseSegments,
+  phaseForCycleDay,
+  fertileWindowInfo,
 } from '../src/cycle';
 import { DEFAULT_SETTINGS, DayLog, Settings } from '../src/types';
 
@@ -134,4 +137,49 @@ test('buildDayMarkers tags days with only symptoms as logged', () => {
   const predictions = computePredictions(logs, DEFAULT_SETTINGS, today);
   const markers = buildDayMarkers(logs, predictions, DEFAULT_SETTINGS, today);
   assert.ok(markers['2024-03-05']?.includes('logged'));
+});
+
+test('buildPhaseSegments covers the entire cycle without gaps', () => {
+  const segs = buildPhaseSegments(28, 5, 14);
+  assert.equal(segs[0].startDay, 1);
+  assert.equal(segs[segs.length - 1].endDay, 28);
+  for (let i = 1; i < segs.length; i++) {
+    assert.equal(
+      segs[i].startDay,
+      segs[i - 1].endDay + 1,
+      `segments must be contiguous around index ${i}`,
+    );
+  }
+  const ovIdx = segs.findIndex((s) => s.phase === 'ovulation');
+  assert.notEqual(ovIdx, -1);
+  assert.equal(segs[ovIdx].startDay, 14);
+  assert.equal(segs[ovIdx].endDay, 14);
+});
+
+test('phaseForCycleDay returns expected phases', () => {
+  const segs = buildPhaseSegments(28, 5, 14);
+  assert.equal(phaseForCycleDay(1, segs), 'period');
+  assert.equal(phaseForCycleDay(5, segs), 'period');
+  assert.equal(phaseForCycleDay(7, segs), 'follicular');
+  assert.equal(phaseForCycleDay(10, segs), 'fertile');
+  assert.equal(phaseForCycleDay(14, segs), 'ovulation');
+  assert.equal(phaseForCycleDay(15, segs), 'fertile');
+  assert.equal(phaseForCycleDay(20, segs), 'luteal');
+  assert.equal(phaseForCycleDay(28, segs), 'luteal');
+});
+
+test('fertileWindowInfo computes remaining days inside window', () => {
+  const segs = buildPhaseSegments(28, 5, 14);
+  const before = fertileWindowInfo(7, segs);
+  assert.equal(before.isInside, false);
+  assert.equal(before.total, 7);
+
+  const inside = fertileWindowInfo(12, segs);
+  assert.equal(inside.isInside, true);
+  assert.equal(inside.remaining, 4);
+  assert.equal(inside.total, 7);
+
+  const after = fertileWindowInfo(20, segs);
+  assert.equal(after.isInside, false);
+  assert.equal(after.remaining, 0);
 });

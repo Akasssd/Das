@@ -1,17 +1,25 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
 import { computeCycleStats } from '../cycle';
+import { tArray } from '../i18n';
 
 export const StatsScreen: React.FC = () => {
-  const { data, colors, t } = useApp();
+  const { data, colors, t, language } = useApp();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const stats = useMemo(
     () => computeCycleStats(data.logs, data.settings),
     [data.logs, data.settings],
   );
+  void language;
+  const months = tArray('monthsGenitive');
+  const fmtDate = (iso: string): string => {
+    const d = parseISO(iso);
+    const m = months[d.getMonth()] ?? '';
+    return `${d.getDate()} ${m} ${d.getFullYear()}`;
+  };
 
   const hasData = stats.cycleLengths.length > 0;
 
@@ -69,9 +77,7 @@ export const StatsScreen: React.FC = () => {
                     : null;
                 return (
                   <View key={start} style={styles.historyRow}>
-                    <Text style={styles.historyDate}>
-                      {format(parseISO(start), 'd MMM yyyy')}
-                    </Text>
+                    <Text style={styles.historyDate}>{fmtDate(start)}</Text>
                     <Text style={styles.historyLen}>
                       {len ? `${len} ${t('stats.days')}` : '—'}
                     </Text>

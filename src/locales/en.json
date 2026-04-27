@@ -3,9 +3,35 @@
     "title": "Cycle Tracker"
   },
   "tabs": {
+    "today": "Today",
     "calendar": "Calendar",
     "stats": "Stats",
     "settings": "Settings"
+  },
+  "today": {
+    "header": "Today",
+    "cycleDay": "Cycle day {{n}}",
+    "noCycle": "No cycle logged yet",
+    "noCycleHint": "Open the Calendar tab and mark the first day of your last period.",
+    "phasePeriod": "Menstruation phase",
+    "phaseFollicular": "Follicular phase",
+    "phaseFertile": "Ovulation phase",
+    "phaseOvulation": "Ovulation phase",
+    "phaseLuteal": "Luteal phase",
+    "innerPeriod": "Menstruation",
+    "innerFollicular": "Recovery",
+    "innerFertile": "Fertile period",
+    "innerOvulation": "Fertile period",
+    "innerLuteal": "Pre-period",
+    "cardUntilPeriod": "Until period:",
+    "cardUntilPeriodNow": "Period today",
+    "cardUntilPeriodLate": "Late {{n}} d",
+    "cardFertileWindow": "Fertile window:",
+    "cardNextOvulation": "Next ovulation:",
+    "valueDays": "{{n}} d",
+    "valueDaysFull": "{{n}} days",
+    "fertileEnded": "Already passed",
+    "fertileStartsIn": "in {{n}} d"
   },
   "home": {
     "welcome": "Welcome",
@@ -94,6 +120,10 @@
   },
   "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
   "months": [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ],
+  "monthsGenitive": [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ]

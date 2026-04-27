@@ -11,15 +11,24 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
 import { CalendarView } from '../components/Calendar';
 import { RootStackParamList } from '../navigation';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { tArray } from '../i18n';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export const CalendarScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const { colors, predictions, t } = useApp();
+  const { colors, predictions, t, language } = useApp();
   const [monthOffset, setMonthOffset] = useState(0);
   const styles = makeStyles(colors);
+  void language;
+  const months = tArray('monthsGenitive');
+  const fmtDate = (iso: string | null): string => {
+    if (!iso) return '—';
+    const d = parseISO(iso);
+    const m = months[d.getMonth()] ?? '';
+    return `${d.getDate()} ${m}`;
+  };
 
   const renderHero = () => {
     if (!predictions.lastPeriodStart) {
@@ -48,19 +57,11 @@ export const CalendarScreen: React.FC = () => {
         <View style={styles.heroRow}>
           <View style={styles.heroCell}>
             <Text style={styles.heroLabel}>{t('home.nextPeriod')}</Text>
-            <Text style={styles.heroValue}>
-              {predictions.nextPeriodStart
-                ? format(parseISO(predictions.nextPeriodStart), 'd MMM')
-                : '—'}
-            </Text>
+            <Text style={styles.heroValue}>{fmtDate(predictions.nextPeriodStart)}</Text>
           </View>
           <View style={styles.heroCell}>
             <Text style={styles.heroLabel}>{t('home.ovulation')}</Text>
-            <Text style={styles.heroValue}>
-              {predictions.ovulation
-                ? format(parseISO(predictions.ovulation), 'd MMM')
-                : '—'}
-            </Text>
+            <Text style={styles.heroValue}>{fmtDate(predictions.ovulation)}</Text>
           </View>
         </View>
       </View>

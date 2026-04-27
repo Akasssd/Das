@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  Today: undefined;
   Calendar: undefined;
   DayDetail: { date: string };
   Stats: undefined;

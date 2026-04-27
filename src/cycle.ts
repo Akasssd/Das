@@ -215,3 +215,104 @@ export const buildDayMarkers = (
 
 const isBleedingExport = isBleeding;
 export { isBleedingExport as isBleeding };
+
+export type CyclePhase =
+  | 'period'
+  | 'follicular'
+  | 'fertile'
+  | 'ovulation'
+  | 'luteal'
+  | 'unknown';
+
+export interface PhaseSegment {
+  phase: CyclePhase;
+  /** 1-based day-of-cycle (inclusive). */
+  startDay: number;
+  /** 1-based day-of-cycle (inclusive). */
+  endDay: number;
+}
+
+export const buildPhaseSegments = (
+  cycleLen: number,
+  periodLen: number,
+  lutealPhaseLength: number,
+): PhaseSegment[] => {
+  const safeCycle = Math.max(15, cycleLen);
+  const safePeriod = Math.max(1, Math.min(periodLen, safeCycle - 4));
+  const safeLuteal = Math.max(9, Math.min(lutealPhaseLength, safeCycle - safePeriod - 2));
+
+  const ovulationDay = safeCycle - safeLuteal;
+  const fertileStartDay = Math.max(safePeriod + 1, ovulationDay - 5);
+  const fertileEndDay = Math.min(safeCycle, ovulationDay + 1);
+
+  const segments: PhaseSegment[] = [];
+  segments.push({ phase: 'period', startDay: 1, endDay: safePeriod });
+  if (fertileStartDay > safePeriod + 1) {
+    segments.push({
+      phase: 'follicular',
+      startDay: safePeriod + 1,
+      endDay: fertileStartDay - 1,
+    });
+  }
+  if (ovulationDay > fertileStartDay) {
+    segments.push({
+      phase: 'fertile',
+      startDay: fertileStartDay,
+      endDay: ovulationDay - 1,
+    });
+  }
+  segments.push({ phase: 'ovulation', startDay: ovulationDay, endDay: ovulationDay });
+  if (fertileEndDay > ovulationDay) {
+    segments.push({
+      phase: 'fertile',
+      startDay: ovulationDay + 1,
+      endDay: fertileEndDay,
+    });
+  }
+  if (safeCycle > fertileEndDay) {
+    segments.push({
+      phase: 'luteal',
+      startDay: fertileEndDay + 1,
+      endDay: safeCycle,
+    });
+  }
+  return segments;
+};
+
+export const phaseForCycleDay = (
+  cycleDay: number,
+  segments: PhaseSegment[],
+): CyclePhase => {
+  for (const s of segments) {
+    if (cycleDay >= s.startDay && cycleDay <= s.endDay) return s.phase;
+  }
+  return 'unknown';
+};
+
+export interface FertileWindowInfo {
+  total: number;
+  remaining: number;
+  isInside: boolean;
+}
+
+export const fertileWindowInfo = (
+  cycleDay: number | null,
+  segments: PhaseSegment[],
+): FertileWindowInfo => {
+  let start: number | null = null;
+  let end: number | null = null;
+  for (const s of segments) {
+    if (s.phase === 'fertile' || s.phase === 'ovulation') {
+      if (start === null || s.startDay < start) start = s.startDay;
+      if (end === null || s.endDay > end) end = s.endDay;
+    }
+  }
+  if (start === null || end === null) {
+    return { total: 0, remaining: 0, isInside: false };
+  }
+  const total = end - start + 1;
+  if (cycleDay === null) return { total, remaining: total, isInside: false };
+  if (cycleDay < start) return { total, remaining: total, isInside: false };
+  if (cycleDay > end) return { total, remaining: 0, isInside: false };
+  return { total, remaining: end - cycleDay + 1, isInside: true };
+};
