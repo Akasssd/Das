@@ -211,37 +211,17 @@ export const OnboardingScreen: React.FC<Props> = ({
           <View>
             <Text style={styles.stepTitle}>{t('onboarding.birthdateTitle')}</Text>
             <Text style={styles.stepHint}>{t('onboarding.birthdateHint')}</Text>
-            <View style={styles.dateRow}>
-              <TextInput
-                value={birthDay}
-                onChangeText={(v) => setBirthDay(v.replace(/\D/g, '').slice(0, 2))}
-                placeholder="ДД"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.input, styles.dateInput]}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-              <TextInput
-                value={birthMonth}
-                onChangeText={(v) =>
-                  setBirthMonth(v.replace(/\D/g, '').slice(0, 2))
-                }
-                placeholder="ММ"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.input, styles.dateInput]}
-                keyboardType="number-pad"
-                maxLength={2}
-              />
-              <TextInput
-                value={birthYear}
-                onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-                placeholder="ГГГГ"
-                placeholderTextColor={colors.textMuted}
-                style={[styles.input, styles.dateInputYear]}
-                keyboardType="number-pad"
-                maxLength={4}
-              />
-            </View>
+            <BirthdateWheel
+              colors={colors}
+              day={birthDay}
+              month={birthMonth}
+              year={birthYear}
+              onChange={(d, m, y) => {
+                setBirthDay(d);
+                setBirthMonth(m);
+                setBirthYear(y);
+              }}
+            />
           </View>
         );
       case 'pin':
@@ -296,6 +276,10 @@ export const OnboardingScreen: React.FC<Props> = ({
               onChangeMonthOffset={setMonthOffset}
               selected={lastPeriod}
               onSelect={setLastPeriod}
+              onPickToday={() => {
+                setMonthOffset(0);
+                setLastPeriod(format(new Date(), 'yyyy-MM-dd'));
+              }}
             />
           </View>
         );
@@ -444,7 +428,10 @@ const MiniCalendar: React.FC<{
   onChangeMonthOffset: (n: number) => void;
   selected: string | null;
   onSelect: (iso: string) => void;
-}> = ({ colors, monthOffset, onChangeMonthOffset, selected, onSelect }) => {
+  onPickToday?: () => void;
+}> = ({ colors, monthOffset, onChangeMonthOffset, selected, onSelect, onPickToday }) => {
+  const { t } = useApp();
+  const todayLabel = t('onboarding.pickToday');
   const styles = makeStyles(colors);
   const today = new Date();
   const anchor = addMonths(today, monthOffset);
@@ -458,6 +445,12 @@ const MiniCalendar: React.FC<{
       <View style={styles.calHeader}>
         <Pressable
           style={styles.calNav}
+          onPress={() => onChangeMonthOffset(monthOffset - 12)}
+        >
+          <Text style={styles.calNavText}>«</Text>
+        </Pressable>
+        <Pressable
+          style={styles.calNav}
           onPress={() => onChangeMonthOffset(monthOffset - 1)}
         >
           <Text style={styles.calNavText}>‹</Text>
@@ -466,11 +459,19 @@ const MiniCalendar: React.FC<{
         <Pressable
           style={styles.calNav}
           onPress={() => {
-            // Don't allow going past current month
             if (monthOffset < 0) onChangeMonthOffset(monthOffset + 1);
           }}
         >
           <Text style={[styles.calNavText, monthOffset >= 0 && { opacity: 0.3 }]}>›</Text>
+        </Pressable>
+        <Pressable
+          style={styles.calNav}
+          onPress={() => {
+            const next = Math.min(0, monthOffset + 12);
+            onChangeMonthOffset(next);
+          }}
+        >
+          <Text style={[styles.calNavText, monthOffset >= 0 && { opacity: 0.3 }]}>»</Text>
         </Pressable>
       </View>
       <View style={styles.calWeekRow}>
@@ -516,6 +517,99 @@ const MiniCalendar: React.FC<{
           );
         })}
       </View>
+      {onPickToday ? (
+        <Pressable style={styles.todayBtn} onPress={onPickToday}>
+          <Text style={styles.todayBtnText}>{todayLabel}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+};
+
+const BirthdateWheel: React.FC<{
+  colors: ThemeColors;
+  day: string;
+  month: string;
+  year: string;
+  onChange: (day: string, month: string, year: string) => void;
+}> = ({ colors, day, month, year, onChange }) => {
+  const { t } = useApp();
+  const styles = makeStyles(colors);
+  const months = tArray('months');
+  const today = new Date();
+  const dn = Number(day) || 1;
+  const mn = Number(month) || 1;
+  const yn = Number(year) || today.getFullYear() - 25;
+  const daysInMonth = new Date(yn, mn, 0).getDate();
+  const clampDay = (n: number) => String(Math.min(daysInMonth, Math.max(1, n))).padStart(2, '0');
+  const setD = (n: number) => onChange(clampDay(n), String(mn).padStart(2, '0'), String(yn));
+  const setM = (n: number) => {
+    const newMonth = ((n - 1 + 12) % 12) + 1;
+    const newDays = new Date(yn, newMonth, 0).getDate();
+    const newDay = Math.min(dn, newDays);
+    onChange(String(newDay).padStart(2, '0'), String(newMonth).padStart(2, '0'), String(yn));
+  };
+  const setY = (n: number) => {
+    const minY = 1925;
+    const maxY = today.getFullYear();
+    const ny = Math.min(maxY, Math.max(minY, n));
+    const newDays = new Date(ny, mn, 0).getDate();
+    const newDay = Math.min(dn, newDays);
+    onChange(String(newDay).padStart(2, '0'), String(mn).padStart(2, '0'), String(ny));
+  };
+  return (
+    <View style={styles.wheelRow}>
+      <WheelColumn
+        label={t('onboarding.birthdateDay')}
+        value={day ? String(dn) : '—'}
+        onMinus={() => setD(dn - 1)}
+        onPlus={() => setD(dn + 1)}
+        colors={colors}
+        flex={1}
+      />
+      <WheelColumn
+        label={t('onboarding.birthdateMonth')}
+        value={month ? months[mn - 1] ?? String(mn) : '—'}
+        onMinus={() => setM(mn - 1)}
+        onPlus={() => setM(mn + 1)}
+        colors={colors}
+        flex={1.4}
+      />
+      <WheelColumn
+        label={t('onboarding.birthdateYear')}
+        value={year ? String(yn) : '—'}
+        onMinus={() => setY(yn - 1)}
+        onPlus={() => setY(yn + 1)}
+        colors={colors}
+        flex={1.2}
+      />
+    </View>
+  );
+};
+
+const WheelColumn: React.FC<{
+  label: string;
+  value: string;
+  onMinus: () => void;
+  onPlus: () => void;
+  colors: ThemeColors;
+  flex: number;
+}> = ({ label, value, onMinus, onPlus, colors, flex }) => {
+  const styles = makeStyles(colors);
+  return (
+    <View style={[styles.wheelCol, { flex }]}>
+      <Pressable style={styles.wheelArrow} onPress={onPlus}>
+        <Text style={styles.wheelArrowText}>⌄</Text>
+      </Pressable>
+      <View style={styles.wheelValueBox}>
+        <Text style={styles.wheelValue} numberOfLines={1}>
+          {value}
+        </Text>
+        <Text style={styles.wheelLabel}>{label}</Text>
+      </View>
+      <Pressable style={styles.wheelArrow} onPress={onMinus}>
+        <Text style={styles.wheelArrowText}>⌃</Text>
+      </Pressable>
     </View>
   );
 };
@@ -697,4 +791,59 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: 'transparent',
     },
     calCellText: { color: colors.text, fontSize: 14 },
+    todayBtn: {
+      alignSelf: 'center',
+      marginTop: 12,
+      paddingVertical: 8,
+      paddingHorizontal: 18,
+      borderRadius: 999,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    todayBtnText: {
+      color: colors.primary,
+      fontWeight: '600',
+      fontSize: 13,
+      letterSpacing: 0.5,
+    },
+    wheelRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    wheelCol: {
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: 8,
+      alignItems: 'center',
+    },
+    wheelArrow: {
+      paddingVertical: 4,
+      paddingHorizontal: 12,
+    },
+    wheelArrowText: {
+      fontSize: 22,
+      color: colors.primary,
+      lineHeight: 22,
+    },
+    wheelValueBox: {
+      alignItems: 'center',
+      paddingVertical: 6,
+    },
+    wheelValue: {
+      fontFamily: SERIF,
+      fontSize: 26,
+      color: colors.text,
+      lineHeight: 30,
+    },
+    wheelLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginTop: 2,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
   });
