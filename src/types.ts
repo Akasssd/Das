@@ -50,9 +50,23 @@ export const DEFAULT_SETTINGS: Settings = {
   showFertileWindow: true,
 };
 
+export interface Profile {
+  name: string;
+  birthdate: string | null; // YYYY-MM-DD
+  pinHash: string | null;
+}
+
+export const DEFAULT_PROFILE: Profile = {
+  name: '',
+  birthdate: null,
+  pinHash: null,
+};
+
 export interface AppData {
   logs: Record<string, DayLog>; // keyed by YYYY-MM-DD
   settings: Settings;
+  profile: Profile;
+  onboardingDone: boolean;
 }
 
 export const SYMPTOMS: SymptomKey[] = [

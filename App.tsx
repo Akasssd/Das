@@ -14,6 +14,8 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { DayDetailScreen } from './src/screens/DayDetailScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { OnboardingScreen } from './src/screens/OnboardingScreen';
+import { LockScreen } from './src/screens/LockScreen';
 import { RootStackParamList } from './src/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -112,7 +114,8 @@ const Tabs: React.FC = () => {
 };
 
 const RootNavigator: React.FC = () => {
-  const { colors, ready } = useApp();
+  const { colors, ready, data } = useApp();
+  const [unlocked, setUnlocked] = React.useState(false);
 
   if (!ready) {
     return (
@@ -148,6 +151,24 @@ const RootNavigator: React.FC = () => {
     colors: { ...baseTheme.colors, ...navTheme.colors },
   };
 
+  if (!data.onboardingDone) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <OnboardingScreen onComplete={() => setUnlocked(true)} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </View>
+    );
+  }
+
+  if (data.profile.pinHash && !unlocked) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <LockScreen onUnlock={() => setUnlocked(true)} />
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+      </View>
+    );
+  }
+
   return (
     <NavigationContainer theme={theme}>
       <Stack.Navigator
@@ -168,6 +189,17 @@ const RootNavigator: React.FC = () => {
           component={DayDetailScreen}
           options={{ title: '' }}
         />
+        <Stack.Screen
+          name="CycleWizard"
+          options={{ title: '' }}
+        >
+          {({ navigation }) => (
+            <OnboardingScreen
+              cycleOnly
+              onComplete={() => navigation.goBack()}
+            />
+          )}
+        </Stack.Screen>
       </Stack.Navigator>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </NavigationContainer>

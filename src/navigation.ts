@@ -5,4 +5,5 @@ export type RootStackParamList = {
   Stats: undefined;
   Settings: undefined;
   Tabs: undefined;
+  CycleWizard: undefined;
 };

@@ -1,22 +1,36 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AppData, DEFAULT_SETTINGS, DayLog, Settings } from './types';
+import {
+  AppData,
+  DEFAULT_PROFILE,
+  DEFAULT_SETTINGS,
+  DayLog,
+  Profile,
+  Settings,
+} from './types';
 
 const STORAGE_KEY = '@cycle-tracker/data/v1';
+
+const emptyAppData = (): AppData => ({
+  logs: {},
+  settings: { ...DEFAULT_SETTINGS },
+  profile: { ...DEFAULT_PROFILE },
+  onboardingDone: false,
+});
 
 export const loadData = async (): Promise<AppData> => {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      return { logs: {}, settings: { ...DEFAULT_SETTINGS } };
-    }
+    if (!raw) return emptyAppData();
     const parsed = JSON.parse(raw) as Partial<AppData>;
     return {
       logs: parsed.logs ?? {},
       settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+      profile: { ...DEFAULT_PROFILE, ...(parsed.profile ?? {}) },
+      onboardingDone: Boolean(parsed.onboardingDone),
     };
   } catch (e) {
     console.warn('Failed to load data', e);
-    return { logs: {}, settings: { ...DEFAULT_SETTINGS } };
+    return emptyAppData();
   }
 };
 
@@ -38,6 +52,8 @@ export const importData = async (json: string): Promise<AppData> => {
   const data: AppData = {
     logs: parsed.logs ?? {},
     settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+    profile: { ...DEFAULT_PROFILE, ...(parsed.profile ?? {}) },
+    onboardingDone: Boolean(parsed.onboardingDone),
   };
   await saveData(data);
   return data;
@@ -47,4 +63,4 @@ export const clearData = async (): Promise<void> => {
   await AsyncStorage.removeItem(STORAGE_KEY);
 };
 
-export type { AppData, DayLog, Settings };
+export type { AppData, DayLog, Profile, Settings };

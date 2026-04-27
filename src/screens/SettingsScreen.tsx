@@ -11,14 +11,21 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
+import { RootStackParamList } from '../navigation';
 import { Settings } from '../types';
 import { exportData } from '../storage';
+import { hashPin } from '../pin';
+
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const APP_VERSION = '0.1.0';
 
 export const SettingsScreen: React.FC = () => {
-  const { data, updateSettings, resetAll, colors, t } = useApp();
+  const { data, updateSettings, updateProfile, resetAll, colors, t } = useApp();
+  const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [cycleLen, setCycleLen] = useState(String(data.settings.averageCycleLength));
   const [periodLen, setPeriodLen] = useState(
@@ -27,6 +34,9 @@ export const SettingsScreen: React.FC = () => {
   const [lutealLen, setLutealLen] = useState(
     String(data.settings.lutealPhaseLength),
   );
+  const [name, setName] = useState(data.profile.name);
+  const [newPin, setNewPin] = useState('');
+  const [newPinConfirm, setNewPinConfirm] = useState('');
 
   const commitNumber = (
     text: string,
@@ -69,10 +79,106 @@ export const SettingsScreen: React.FC = () => {
     ]);
   };
 
+  const handleSetPin = async () => {
+    if (newPin.length < 4) {
+      Alert.alert(t('onboarding.pinTooShort'));
+      return;
+    }
+    if (newPin !== newPinConfirm) {
+      Alert.alert(t('onboarding.pinMismatch'));
+      return;
+    }
+    await updateProfile({ pinHash: hashPin(newPin) });
+    setNewPin('');
+    setNewPinConfirm('');
+    Alert.alert(t('settings.pinSaved'));
+  };
+
+  const handleClearPin = async () => {
+    await updateProfile({ pinHash: null });
+    setNewPin('');
+    setNewPinConfirm('');
+  };
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.h1}>{t('settings.title')}</Text>
+
+        <Section title={t('settings.profile')} colors={colors}>
+          <Text style={styles.rowLabel}>{t('settings.name')}</Text>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            onBlur={() => {
+              if (name.trim() !== data.profile.name) {
+                void updateProfile({ name: name.trim() });
+              }
+            }}
+            style={[styles.input, { marginTop: 8 }]}
+            placeholder={t('settings.namePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+          />
+          {data.profile.birthdate ? (
+            <Text style={[styles.rowLabel, { marginTop: 12, color: colors.textMuted, fontSize: 13 }]}>
+              {t('settings.birthdate')}: {data.profile.birthdate}
+            </Text>
+          ) : null}
+        </Section>
+
+        <Section title={t('settings.cycleSetup')} colors={colors}>
+          <Pressable
+            style={styles.actionBtn}
+            onPress={() => navigation.navigate('CycleWizard')}
+          >
+            <Text style={styles.actionBtnText}>{t('settings.openCycleWizard')}</Text>
+          </Pressable>
+          <Text style={[styles.rowLabel, { marginTop: 12, color: colors.textMuted, fontSize: 13 }]}>
+            {t('settings.cycleSetupHint')}
+          </Text>
+        </Section>
+
+        <Section title={t('settings.pinTitle')} colors={colors}>
+          {data.profile.pinHash ? (
+            <>
+              <Text style={[styles.rowLabel, { color: colors.textMuted, fontSize: 13, marginBottom: 12 }]}>
+                {t('settings.pinSet')}
+              </Text>
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: colors.danger }]}
+                onPress={handleClearPin}
+              >
+                <Text style={styles.actionBtnText}>{t('settings.clearPin')}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <TextInput
+                value={newPin}
+                onChangeText={(v) => setNewPin(v.replace(/\D/g, '').slice(0, 6))}
+                placeholder={t('settings.pinNew')}
+                placeholderTextColor={colors.textMuted}
+                style={styles.input}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+              />
+              <TextInput
+                value={newPinConfirm}
+                onChangeText={(v) => setNewPinConfirm(v.replace(/\D/g, '').slice(0, 6))}
+                placeholder={t('settings.pinConfirm')}
+                placeholderTextColor={colors.textMuted}
+                style={[styles.input, { marginTop: 8 }]}
+                keyboardType="number-pad"
+                secureTextEntry
+                maxLength={6}
+              />
+              <Pressable style={[styles.actionBtn, { marginTop: 12 }]} onPress={handleSetPin}>
+                <Text style={styles.actionBtnText}>{t('settings.savePin')}</Text>
+              </Pressable>
+            </>
+          )}
+        </Section>
 
         <Section title={t('settings.averageCycleLength')} colors={colors}>
           <TextInput

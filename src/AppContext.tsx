@@ -7,7 +7,14 @@ import React, {
   useState,
 } from 'react';
 import { useColorScheme } from 'react-native';
-import { AppData, DEFAULT_SETTINGS, DayLog, Settings } from './types';
+import {
+  AppData,
+  DEFAULT_PROFILE,
+  DEFAULT_SETTINGS,
+  DayLog,
+  Profile,
+  Settings,
+} from './types';
 import { loadData, saveData, clearData as clearStorage } from './storage';
 import { setLocale, t as translate } from './i18n';
 import { ThemeColors, resolveColors } from './theme';
@@ -22,6 +29,8 @@ interface AppContextValue {
   upsertLog: (log: DayLog) => Promise<void>;
   removeLog: (date: string) => Promise<void>;
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
+  updateProfile: (patch: Partial<Profile>) => Promise<void>;
+  setOnboardingDone: (done: boolean) => Promise<void>;
   replaceData: (next: AppData) => Promise<void>;
   resetAll: () => Promise<void>;
   // i18n helpers tied to language so consumers re-render on change
@@ -47,6 +56,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [data, setData] = useState<AppData>({
     logs: {},
     settings: { ...DEFAULT_SETTINGS },
+    profile: { ...DEFAULT_PROFILE },
+    onboardingDone: false,
   });
 
   useEffect(() => {
@@ -101,6 +112,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [data, persist],
   );
 
+  const updateProfile = useCallback(
+    async (patch: Partial<Profile>) => {
+      const next: AppData = { ...data, profile: { ...data.profile, ...patch } };
+      await persist(next);
+    },
+    [data, persist],
+  );
+
+  const setOnboardingDone = useCallback(
+    async (done: boolean) => {
+      const next: AppData = { ...data, onboardingDone: done };
+      await persist(next);
+    },
+    [data, persist],
+  );
+
   const replaceData = useCallback(
     async (next: AppData) => {
       await persist(next);
@@ -110,7 +137,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const resetAll = useCallback(async () => {
     await clearStorage();
-    const fresh: AppData = { logs: {}, settings: { ...DEFAULT_SETTINGS } };
+    const fresh: AppData = {
+      logs: {},
+      settings: { ...DEFAULT_SETTINGS },
+      profile: { ...DEFAULT_PROFILE },
+      onboardingDone: false,
+    };
     setData(fresh);
   }, []);
 
@@ -142,6 +174,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       upsertLog,
       removeLog,
       updateSettings,
+      updateProfile,
+      setOnboardingDone,
       replaceData,
       resetAll,
       t,
@@ -155,6 +189,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       upsertLog,
       removeLog,
       updateSettings,
+      updateProfile,
+      setOnboardingDone,
       replaceData,
       resetAll,
       t,
