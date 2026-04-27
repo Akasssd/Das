@@ -187,26 +187,35 @@ export const buildDayMarkers = (
     }
   }
 
-  if (predictions.nextPeriodStart && predictions.nextPeriodEnd) {
-    let cursor = parseISO(predictions.nextPeriodStart);
-    const end = parseISO(predictions.nextPeriodEnd);
-    while (differenceInCalendarDays(cursor, end) <= 0) {
-      const d = fmt(cursor);
-      if (!isBleeding(logs[d])) add(d, 'predictedPeriod');
-      cursor = addDays(cursor, 1);
-    }
-  }
-
-  if (settings.showFertileWindow) {
-    if (predictions.fertileStart && predictions.fertileEnd) {
-      let cursor = parseISO(predictions.fertileStart);
-      const end = parseISO(predictions.fertileEnd);
-      while (differenceInCalendarDays(cursor, end) <= 0) {
-        add(fmt(cursor), 'fertile');
-        cursor = addDays(cursor, 1);
+  // Project the cycle forward for ~12 months so users can see future
+  // predicted periods, ovulations, and fertile windows on the calendar
+  // far ahead — useful for planning travel, conception, etc.
+  if (predictions.nextPeriodStart) {
+    const cycleLen = predictions.effectiveCycleLength;
+    const periodLen = predictions.effectivePeriodLength;
+    const luteal = settings.lutealPhaseLength;
+    const horizonDays = 365;
+    let startCursor = parseISO(predictions.nextPeriodStart);
+    while (differenceInCalendarDays(startCursor, today) <= horizonDays) {
+      // Predicted bleeding days
+      for (let i = 0; i < periodLen; i++) {
+        const d = fmt(addDays(startCursor, i));
+        if (!isBleeding(logs[d])) add(d, 'predictedPeriod');
       }
+      // Ovulation + fertile window for this projected cycle
+      if (settings.showFertileWindow) {
+        const ovDate = addDays(startCursor, -luteal);
+        const fertileStart = addDays(ovDate, -5);
+        const fertileEnd = addDays(ovDate, 1);
+        let fc = fertileStart;
+        while (differenceInCalendarDays(fc, fertileEnd) <= 0) {
+          add(fmt(fc), 'fertile');
+          fc = addDays(fc, 1);
+        }
+        add(fmt(ovDate), 'ovulation');
+      }
+      startCursor = addDays(startCursor, cycleLen);
     }
-    if (predictions.ovulation) add(predictions.ovulation, 'ovulation');
   }
 
   add(fmt(today), 'today');

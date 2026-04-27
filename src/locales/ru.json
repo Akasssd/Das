@@ -36,7 +36,13 @@
     "valueDays": "{{n}} дн.",
     "valueDaysFull": "{{n}} дней",
     "fertileEnded": "уже прошло",
-    "fertileStartsIn": "через {{n}} дн."
+    "fertileStartsIn": "через {{n}} дн.",
+    "confirmTitle": "Месячные начались сегодня?",
+    "confirmHint": "Если цикл сбился, подтверди — пересчитаем прогноз.",
+    "confirmYes": "Да, начались",
+    "confirmNo": "Ещё нет",
+    "confirmSavedTitle": "Записал",
+    "confirmSavedHint": "Прогноз пересчитан с сегодняшней даты."
   },
   "home": {
     "welcome": "Добро пожаловать",

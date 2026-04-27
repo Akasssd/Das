@@ -1,5 +1,6 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
-import { addDays, parseISO } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
 import { tArray } from '../i18n';
 import {
@@ -141,12 +142,36 @@ const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
 );
 
 export const TodayScreen: React.FC = () => {
-  const { data, predictions, colors, t, language } = useApp();
+  const { data, predictions, colors, t, language, upsertLogs } = useApp();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const today = new Date();
+  const todayKey = format(today, 'yyyy-MM-dd');
+  const [confirmDismissed, setConfirmDismissed] = useState(false);
+  const [confirmJustSaved, setConfirmJustSaved] = useState(false);
+  const todayAlreadyLogged = (() => {
+    const log = data.logs[todayKey];
+    return !!(log && log.flow && log.flow !== 'none');
+  })();
+
+  // Show the "did your period start today?" prompt only when today is near
+  // the predicted next-period start (±2 days) and the user hasn't already
+  // logged a flow for today.
+  const showConfirmCard = (() => {
+    if (todayAlreadyLogged) return false;
+    if (confirmDismissed) return false;
+    const days = predictions.daysUntilNextPeriod;
+    if (days === null) return false;
+    return days <= 2 && days >= -7;
+  })();
+
+  const onConfirmYes = async () => {
+    await upsertLogs([{ date: todayKey, flow: 'medium' }]);
+    setConfirmJustSaved(true);
+  };
+  const onConfirmNo = () => setConfirmDismissed(true);
   const cycleLen = predictions.effectiveCycleLength;
   const periodLen = predictions.effectivePeriodLength;
   const lutealLen = data.settings.lutealPhaseLength;
@@ -255,6 +280,10 @@ export const TodayScreen: React.FC = () => {
       styles={styles}
       t={t}
       insets={insets}
+      showConfirmCard={showConfirmCard}
+      confirmJustSaved={confirmJustSaved}
+      onConfirmYes={onConfirmYes}
+      onConfirmNo={onConfirmNo}
     />
   );
 };
@@ -275,6 +304,10 @@ interface TodayInnerProps {
   styles: ReturnType<typeof makeStyles>;
   t: (key: string, vars?: Record<string, string | number>) => string;
   insets: { top: number; right: number; bottom: number; left: number };
+  showConfirmCard: boolean;
+  confirmJustSaved: boolean;
+  onConfirmYes: () => void;
+  onConfirmNo: () => void;
 }
 
 const TodayInner: React.FC<TodayInnerProps> = ({
@@ -293,6 +326,10 @@ const TodayInner: React.FC<TodayInnerProps> = ({
   styles,
   t,
   insets,
+  showConfirmCard,
+  confirmJustSaved,
+  onConfirmYes,
+  onConfirmNo,
 }) => {
   const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
@@ -368,6 +405,42 @@ const TodayInner: React.FC<TodayInnerProps> = ({
         {isEmpty ? (
           <View style={styles.ctaWrap}>
             <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
+          </View>
+        ) : null}
+
+        {!isEmpty && showConfirmCard && !confirmJustSaved ? (
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{t('today.confirmTitle')}</Text>
+            <Text style={styles.confirmHint}>{t('today.confirmHint')}</Text>
+            <View style={styles.confirmRow}>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnPrimary]}
+                onPress={onConfirmYes}
+              >
+                <Text style={styles.confirmBtnPrimaryText}>
+                  {t('today.confirmYes')}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.confirmBtn, styles.confirmBtnGhost]}
+                onPress={onConfirmNo}
+              >
+                <Text style={styles.confirmBtnGhostText}>
+                  {t('today.confirmNo')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
+
+        {!isEmpty && confirmJustSaved ? (
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>
+              {t('today.confirmSavedTitle')}
+            </Text>
+            <Text style={styles.confirmHint}>
+              {t('today.confirmSavedHint')}
+            </Text>
           </View>
         ) : null}
 
@@ -535,5 +608,60 @@ const makeStyles = (colors: ThemeColors) =>
       textAlign: 'center',
       maxWidth: 280,
       lineHeight: 17,
+    },
+    confirmCard: {
+      marginTop: 16,
+      marginHorizontal: 16,
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    confirmTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+      textAlign: 'center',
+      fontFamily: SERIF,
+    },
+    confirmHint: {
+      marginTop: 6,
+      fontSize: 12.5,
+      color: colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 17,
+    },
+    confirmRow: {
+      marginTop: 14,
+      flexDirection: 'row',
+      gap: 10,
+    },
+    confirmBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    confirmBtnPrimary: {
+      backgroundColor: colors.primary,
+    },
+    confirmBtnPrimaryText: {
+      color: '#FFFCF7',
+      fontSize: 14,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    confirmBtnGhost: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    confirmBtnGhostText: {
+      color: colors.text,
+      fontSize: 14,
+      fontWeight: '600',
     },
   });

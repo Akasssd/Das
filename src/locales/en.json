@@ -36,7 +36,13 @@
     "valueDays": "{{n}} d",
     "valueDaysFull": "{{n}} days",
     "fertileEnded": "Already passed",
-    "fertileStartsIn": "in {{n}} d"
+    "fertileStartsIn": "in {{n}} d",
+    "confirmTitle": "Did your period start today?",
+    "confirmHint": "If your cycle has shifted, confirm — we'll recalculate.",
+    "confirmYes": "Yes, started",
+    "confirmNo": "Not yet",
+    "confirmSavedTitle": "Logged",
+    "confirmSavedHint": "Forecast recalculated from today."
   },
   "home": {
     "welcome": "Welcome",
