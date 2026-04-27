@@ -47,23 +47,24 @@ export const lightColors: ThemeColors = {
 };
 
 export const darkColors: ThemeColors = {
+  // "Dim" warm palette — dark mode that still feels cream-tinted, not chocolate.
   mode: 'dark',
-  background: '#1B130C',
-  backgroundAccent: '#2A1D11',
-  card: '#26190F',
-  surface: '#2F2014',
-  text: '#F2E1CC',
-  textMuted: '#B49E83',
-  border: '#3D2C1D',
+  background: '#3A2D22',
+  backgroundAccent: '#4A3A2C',
+  card: '#473628',
+  surface: '#4F3D2D',
+  text: '#F4E4CF',
+  textMuted: '#C9B299',
+  border: '#5A4534',
   primary: '#E8B58D',
-  primaryText: '#1B130C',
-  period: '#E89993',
-  predictedPeriod: '#5A3E33',
+  primaryText: '#3A2D22',
+  period: '#E5A8A3',
+  predictedPeriod: '#7A5A4B',
   ovulation: '#E8B58D',
-  fertile: '#A87B5C',
-  follicular: '#5C4536',
-  luteal: '#553D2C',
-  ringTrack: '#3A2A1D',
+  fertile: '#C0916F',
+  follicular: '#7A5E47',
+  luteal: '#735540',
+  ringTrack: '#5A4534',
   today: '#F4D6B4',
   danger: '#E08962',
   accent: '#E8B58D',
@@ -71,8 +72,11 @@ export const darkColors: ThemeColors = {
 
 export const resolveColors = (
   pref: 'auto' | 'light' | 'dark',
-  system: ColorSchemeName,
+  _system: ColorSchemeName,
 ): ThemeColors => {
-  const mode = pref === 'auto' ? system ?? 'light' : pref;
-  return mode === 'dark' ? darkColors : lightColors;
+  // "Auto" defaults to the warm light palette — dark mode is opt-in only.
+  // Without this, an iPhone in system dark mode flips the whole UI to brown
+  // and the warm cream/peach aesthetic disappears.
+  if (pref === 'dark') return darkColors;
+  return lightColors;
 };

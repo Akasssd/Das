@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: Settings = {
   averagePeriodLength: 5,
   lutealPhaseLength: 14,
   language: 'auto',
-  theme: 'auto',
+  theme: 'light',
   showFertileWindow: true,
 };
 
