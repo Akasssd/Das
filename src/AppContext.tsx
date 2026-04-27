@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useColorScheme } from 'react-native';
@@ -67,6 +68,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     loadData().then((loaded) => {
       if (!mounted) return;
       setLocale(loaded.settings.language);
+      dataRef.current = loaded;
       setData(loaded);
       setReady(true);
     });
@@ -79,14 +81,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // bumps `language` already produces translated strings.
   setLocale(data.settings.language);
 
+  // Latest-data ref so callbacks always read the freshest snapshot. Without
+  // this, awaiting two mutator calls back-to-back (e.g. updateSettings then
+  // upsertLogs in onboarding finalize) clobbers each other because each
+  // closure captured `data` from the render before the first call resolved.
+  const dataRef = useRef<AppData>(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
   const persist = useCallback(async (next: AppData) => {
+    dataRef.current = next;
     setData(next);
     await saveData(next);
   }, []);
 
   const upsertLog = useCallback(
     async (log: DayLog) => {
-      const next: AppData = { ...data, logs: { ...data.logs } };
+      const current = dataRef.current;
+      const next: AppData = { ...current, logs: { ...current.logs } };
       if (isLogEmpty(log)) {
         delete next.logs[log.date];
       } else {
@@ -94,15 +107,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
-  // Apply many log changes at once. Necessary because the per-call upsertLog
-  // closes over `data` from the current render and would clobber earlier
-  // writes within the same tick (e.g. logging a 7-day period range).
+  // Apply many log changes at once.
   const upsertLogs = useCallback(
     async (logs: DayLog[]) => {
-      const next: AppData = { ...data, logs: { ...data.logs } };
+      const current = dataRef.current;
+      const next: AppData = { ...current, logs: { ...current.logs } };
       for (const log of logs) {
         if (isLogEmpty(log)) {
           delete next.logs[log.date];
@@ -112,40 +124,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
   const removeLog = useCallback(
     async (date: string) => {
-      const next: AppData = { ...data, logs: { ...data.logs } };
+      const current = dataRef.current;
+      const next: AppData = { ...current, logs: { ...current.logs } };
       delete next.logs[date];
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
   const updateSettings = useCallback(
     async (patch: Partial<Settings>) => {
-      const next: AppData = { ...data, settings: { ...data.settings, ...patch } };
+      const current = dataRef.current;
+      const next: AppData = {
+        ...current,
+        settings: { ...current.settings, ...patch },
+      };
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
   const updateProfile = useCallback(
     async (patch: Partial<Profile>) => {
-      const next: AppData = { ...data, profile: { ...data.profile, ...patch } };
+      const current = dataRef.current;
+      const next: AppData = {
+        ...current,
+        profile: { ...current.profile, ...patch },
+      };
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
   const setOnboardingDone = useCallback(
     async (done: boolean) => {
-      const next: AppData = { ...data, onboardingDone: done };
+      const current = dataRef.current;
+      const next: AppData = { ...current, onboardingDone: done };
       await persist(next);
     },
-    [data, persist],
+    [persist],
   );
 
   const replaceData = useCallback(
@@ -163,6 +185,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       profile: { ...DEFAULT_PROFILE },
       onboardingDone: false,
     };
+    dataRef.current = fresh;
     setData(fresh);
   }, []);
 
