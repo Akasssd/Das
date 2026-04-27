@@ -9,7 +9,7 @@ import React, {
 import { useColorScheme } from 'react-native';
 import { AppData, DEFAULT_SETTINGS, DayLog, Settings } from './types';
 import { loadData, saveData, clearData as clearStorage } from './storage';
-import { setLocale, t } from './i18n';
+import { setLocale, t as translate } from './i18n';
 import { ThemeColors, resolveColors } from './theme';
 import { computePredictions, CyclePredictions } from './cycle';
 
@@ -62,9 +62,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
-  useEffect(() => {
-    setLocale(data.settings.language);
-  }, [data.settings.language]);
+  // Keep i18n in sync synchronously during render so the same render that
+  // bumps `language` already produces translated strings.
+  setLocale(data.settings.language);
 
   const persist = useCallback(async (next: AppData) => {
     setData(next);
@@ -124,6 +124,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [data.settings.theme, system],
   );
 
+  const language = data.settings.language;
+  const t = useCallback(
+    (key: string, opts?: Record<string, unknown>) => {
+      void language;
+      return translate(key, opts);
+    },
+    [language],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       ready,
@@ -136,7 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       replaceData,
       resetAll,
       t,
-      language: data.settings.language,
+      language,
     }),
     [
       ready,
@@ -148,6 +157,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateSettings,
       replaceData,
       resetAll,
+      t,
+      language,
     ],
   );
 
