@@ -40,6 +40,12 @@
         "projectId": "8ae94582-7b2b-4ec5-bbcc-37dff247f4a5"
       }
     },
-    "owner": "ivan_bulychev"
+    "owner": "ivan_bulychev",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8ae94582-7b2b-4ec5-bbcc-37dff247f4a5"
+    }
   }
 }

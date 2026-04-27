@@ -174,8 +174,24 @@ const RootNavigator: React.FC = () => {
   );
 };
 
+const useViewportWidth = (): number => {
+  const get = () => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return 1024;
+    return window.innerWidth;
+  };
+  const [w, setW] = React.useState(get);
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const onResize = () => setW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return w;
+};
+
 const PhoneFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  if (Platform.OS !== 'web') return <>{children}</>;
+  const width = useViewportWidth();
+  if (Platform.OS !== 'web' || width < 700) return <>{children}</>;
   return (
     <View style={frameStyles.outer}>
       <View style={frameStyles.frame}>{children}</View>
