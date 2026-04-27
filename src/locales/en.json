@@ -1,0 +1,100 @@
+{
+  "app": {
+    "title": "Cycle Tracker"
+  },
+  "tabs": {
+    "calendar": "Calendar",
+    "stats": "Stats",
+    "settings": "Settings"
+  },
+  "home": {
+    "welcome": "Welcome",
+    "noDataTitle": "No cycle logged yet",
+    "noDataBody": "Tap a day on the calendar and mark when your period started to see predictions.",
+    "cycleDay": "Cycle day",
+    "daysUntilPeriod": "days until next period",
+    "periodToday": "Period predicted today",
+    "periodLate": "{{n}} days late",
+    "lastPeriod": "Last period",
+    "nextPeriod": "Next period",
+    "ovulation": "Ovulation",
+    "fertileWindow": "Fertile window"
+  },
+  "day": {
+    "title": "Day",
+    "flow": "Flow",
+    "symptoms": "Symptoms",
+    "mood": "Mood",
+    "temperature": "Basal temperature (°C)",
+    "notes": "Notes",
+    "notesPlaceholder": "Anything to remember…",
+    "intimacy": "Intimacy",
+    "save": "Save",
+    "delete": "Delete entry"
+  },
+  "flow": {
+    "none": "None",
+    "spotting": "Spotting",
+    "light": "Light",
+    "medium": "Medium",
+    "heavy": "Heavy"
+  },
+  "symptoms": {
+    "cramps": "Cramps",
+    "headache": "Headache",
+    "backache": "Backache",
+    "bloating": "Bloating",
+    "breastTenderness": "Breast tenderness",
+    "acne": "Acne",
+    "fatigue": "Fatigue",
+    "nausea": "Nausea",
+    "cravings": "Cravings",
+    "insomnia": "Insomnia"
+  },
+  "moods": {
+    "happy": "Happy",
+    "calm": "Calm",
+    "sad": "Sad",
+    "anxious": "Anxious",
+    "irritable": "Irritable",
+    "energetic": "Energetic",
+    "tired": "Tired",
+    "sensitive": "Sensitive"
+  },
+  "stats": {
+    "title": "Statistics",
+    "averageCycle": "Average cycle",
+    "averagePeriod": "Average period",
+    "shortest": "Shortest cycle",
+    "longest": "Longest cycle",
+    "tracked": "Tracked cycles",
+    "days": "days",
+    "noData": "Log at least two periods to see statistics.",
+    "history": "Cycle history"
+  },
+  "settings": {
+    "title": "Settings",
+    "averageCycleLength": "Average cycle length",
+    "averagePeriodLength": "Average period length",
+    "lutealPhase": "Luteal phase length",
+    "language": "Language",
+    "languageAuto": "System",
+    "languageEn": "English",
+    "languageRu": "Russian",
+    "showFertileWindow": "Show fertile window",
+    "exportData": "Export data",
+    "importData": "Import data",
+    "clearData": "Clear all data",
+    "clearConfirmTitle": "Delete everything?",
+    "clearConfirmBody": "All cycle logs and settings will be erased. This cannot be undone.",
+    "cancel": "Cancel",
+    "confirm": "Delete",
+    "version": "Version",
+    "disclaimer": "This app is for informational purposes only and does not replace medical advice."
+  },
+  "weekdays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  "months": [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ]
+}
