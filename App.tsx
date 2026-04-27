@@ -234,10 +234,10 @@ const PhoneFrame: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const frameStyles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: '#2A1D11',
+    backgroundColor: '#F4EADB',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
+    padding: 24,
   },
   frame: {
     width: '100%',
@@ -247,12 +247,12 @@ const frameStyles = StyleSheet.create({
     borderRadius: 44,
     overflow: 'hidden',
     backgroundColor: '#FBF6EF',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 32,
-    shadowOffset: { width: 0, height: 16 },
-    borderWidth: 8,
-    borderColor: '#1B130C',
+    shadowColor: '#8E6F58',
+    shadowOpacity: 0.18,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 20 },
+    borderWidth: 4,
+    borderColor: '#EADBC4',
   },
 });
 

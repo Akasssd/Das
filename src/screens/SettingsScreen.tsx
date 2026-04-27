@@ -18,6 +18,8 @@ import { RootStackParamList } from '../navigation';
 import { Settings } from '../types';
 import { exportData } from '../storage';
 import { hashPin } from '../pin';
+import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
+import { ThemeColors } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -102,6 +104,7 @@ export const SettingsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <WaveBackground colors={colors} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.h1}>{t('settings.title')}</Text>
 
@@ -290,7 +293,7 @@ export const SettingsScreen: React.FC = () => {
 
 const Section: React.FC<{
   title: string;
-  colors: ReturnType<typeof useApp>['colors'];
+  colors: ThemeColors;
   children: React.ReactNode;
 }> = ({ title, colors, children }) => {
   const styles = makeStyles(colors);
@@ -302,15 +305,17 @@ const Section: React.FC<{
   );
 };
 
-const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
+const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16 },
+    content: { padding: 16, paddingTop: 8 },
     h1: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 12,
+      fontSize: 32,
+      fontFamily: SERIF_STACK,
+      fontWeight: '300',
+      color: colors.primary,
+      marginBottom: 16,
+      marginTop: 8,
     },
     section: { marginBottom: 16 },
     sectionTitle: {
@@ -323,10 +328,15 @@ const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
     },
     sectionBody: {
       backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 12,
+      borderRadius: 18,
+      padding: 14,
       borderWidth: 1,
       borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 1,
     },
     input: {
       borderRadius: 12,
@@ -357,14 +367,15 @@ const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
     actionBtn: {
       backgroundColor: colors.primary,
       paddingVertical: 14,
-      borderRadius: 14,
+      borderRadius: 16,
       alignItems: 'center',
       marginTop: 8,
     },
     actionBtnText: {
       color: colors.primaryText,
-      fontWeight: '700',
+      fontWeight: '600',
       fontSize: 16,
+      letterSpacing: 0.4,
     },
     disclaimer: {
       color: colors.textMuted,

@@ -5,6 +5,8 @@ import { parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
 import { computeCycleStats } from '../cycle';
 import { tArray } from '../i18n';
+import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
+import { ThemeColors } from '../theme';
 
 export const StatsScreen: React.FC = () => {
   const { data, colors, t, language } = useApp();
@@ -25,6 +27,7 @@ export const StatsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <WaveBackground colors={colors} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.h1}>{t('stats.title')}</Text>
 
@@ -96,7 +99,7 @@ export const StatsScreen: React.FC = () => {
 const StatCard: React.FC<{
   label: string;
   value: string;
-  colors: ReturnType<typeof useApp>['colors'];
+  colors: ThemeColors;
 }> = ({ label, value, colors }) => {
   const styles = makeStyles(colors);
   return (
@@ -107,59 +110,73 @@ const StatCard: React.FC<{
   );
 };
 
-const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
+const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16 },
+    content: { padding: 16, paddingTop: 8 },
     h1: {
-      fontSize: 24,
-      fontWeight: '700',
-      color: colors.text,
-      marginBottom: 12,
+      fontSize: 32,
+      fontFamily: SERIF_STACK,
+      fontWeight: '300',
+      color: colors.primary,
+      marginBottom: 16,
+      marginTop: 8,
     },
     card: {
       backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
+      borderRadius: 18,
+      padding: 18,
       borderWidth: 1,
       borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 1,
     },
     cardTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: colors.text,
+      fontSize: 13,
+      color: colors.textMuted,
       marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      fontWeight: '600',
     },
-    muted: { color: colors.textMuted, fontSize: 14 },
-    statRow: { flexDirection: 'row', marginBottom: 12 },
+    muted: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    statRow: { flexDirection: 'row', marginBottom: 12, gap: 8 },
     statCard: {
       flex: 1,
       backgroundColor: colors.card,
-      borderRadius: 16,
+      borderRadius: 18,
       padding: 16,
-      marginRight: 8,
       borderWidth: 1,
       borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.04,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 1,
     },
     statLabel: {
       color: colors.textMuted,
-      fontSize: 12,
-      marginBottom: 4,
+      fontSize: 11,
+      marginBottom: 6,
       textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      letterSpacing: 0.6,
     },
     statValue: {
-      color: colors.text,
-      fontSize: 22,
-      fontWeight: '700',
+      color: colors.primary,
+      fontSize: 26,
+      fontFamily: SERIF_STACK,
+      fontWeight: '300',
     },
     historyRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      paddingVertical: 8,
+      paddingVertical: 10,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
-    historyDate: { color: colors.text, fontSize: 14 },
+    historyDate: { color: colors.text, fontSize: 14, fontFamily: SERIF_STACK },
     historyLen: { color: colors.textMuted, fontSize: 14 },
   });

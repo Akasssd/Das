@@ -19,6 +19,7 @@ import {
 } from '../cycle';
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
+import { WaveBackground } from '../components/WaveBackground';
 
 const ruDayWord = (n: number): string => {
   const a = Math.abs(n) % 100;
@@ -136,48 +137,6 @@ const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
     <Rect x={16} y={40} width={8} height={6} rx={1.5} fill={colors.fertile} />
     <Rect x={28} y={40} width={8} height={6} rx={1.5} fill={colors.primary} />
     <Rect x={40} y={40} width={8} height={6} rx={1.5} fill={colors.fertile} />
-  </Svg>
-);
-
-const WaveBackground: React.FC<{ colors: ThemeColors }> = ({ colors }) => (
-  <Svg
-    style={StyleSheet.absoluteFill}
-    width="100%"
-    height="100%"
-    viewBox="0 0 400 800"
-    preserveAspectRatio="xMidYMid slice"
-  >
-    <Path
-      d="M0 120 Q 100 60 220 120 T 400 140 L 400 0 L 0 0 Z"
-      fill={colors.backgroundAccent}
-      opacity={0.45}
-    />
-    <Path
-      d="M0 220 Q 120 160 240 220 T 400 240"
-      fill="none"
-      stroke={colors.backgroundAccent}
-      strokeWidth={1.5}
-      opacity={0.5}
-    />
-    <Path
-      d="M0 720 Q 100 660 220 720 T 400 720 L 400 800 L 0 800 Z"
-      fill={colors.backgroundAccent}
-      opacity={0.45}
-    />
-    <Path
-      d="M-20 540 Q 80 480 200 540 T 420 540"
-      fill="none"
-      stroke={colors.backgroundAccent}
-      strokeWidth={1.5}
-      opacity={0.5}
-    />
-    <Path
-      d="M-20 600 Q 100 560 220 600 T 420 580"
-      fill="none"
-      stroke={colors.backgroundAccent}
-      strokeWidth={1}
-      opacity={0.4}
-    />
   </Svg>
 );
 
@@ -418,21 +377,22 @@ const makeStyles = (colors: ThemeColors) =>
     },
     bigDate: {
       fontSize: 56,
-      color: colors.text,
+      color: colors.primary,
       fontWeight: '300',
       letterSpacing: 0.5,
+      marginBottom: 8,
     },
     subDivider: {
       height: 1,
       backgroundColor: colors.border,
-      width: 80,
-      marginTop: 8,
-      marginBottom: 8,
+      width: 110,
+      marginTop: 10,
+      marginBottom: 10,
     },
     cycleDay: {
       fontSize: 18,
       color: colors.textMuted,
-      marginBottom: 6,
+      marginBottom: 0,
     },
     phaseLabel: {
       fontSize: 15,

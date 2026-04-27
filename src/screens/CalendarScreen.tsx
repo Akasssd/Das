@@ -13,6 +13,8 @@ import { CalendarView } from '../components/Calendar';
 import { RootStackParamList } from '../navigation';
 import { parseISO } from 'date-fns';
 import { tArray } from '../i18n';
+import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
+import { ThemeColors } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -54,6 +56,7 @@ export const CalendarScreen: React.FC = () => {
           {t('home.cycleDay')} {predictions.cycleDay ?? ''}
         </Text>
         <Text style={styles.heroTitle}>{primary}</Text>
+        <View style={styles.heroDivider} />
         <View style={styles.heroRow}>
           <View style={styles.heroCell}>
             <Text style={styles.heroLabel}>{t('home.nextPeriod')}</Text>
@@ -70,6 +73,7 @@ export const CalendarScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
+      <WaveBackground colors={colors} />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -88,46 +92,60 @@ export const CalendarScreen: React.FC = () => {
   );
 };
 
-const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
+const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
     content: { padding: 16, paddingBottom: 24 },
     hero: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.card,
       borderRadius: 22,
       padding: 20,
       marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 1,
     },
     heroEyebrow: {
-      color: colors.primaryText,
-      opacity: 0.85,
+      color: colors.textMuted,
       fontSize: 13,
       fontWeight: '600',
-      marginBottom: 6,
-      letterSpacing: 0.4,
+      marginBottom: 8,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
     },
     heroTitle: {
-      color: colors.primaryText,
-      fontSize: 24,
-      fontWeight: '700',
-      marginBottom: 12,
+      color: colors.primary,
+      fontSize: 30,
+      fontFamily: SERIF_STACK,
+      fontWeight: '300',
+      marginBottom: 4,
     },
     heroSubtitle: {
-      color: colors.primaryText,
-      opacity: 0.9,
+      color: colors.textMuted,
       fontSize: 14,
+      lineHeight: 20,
+    },
+    heroDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 14,
     },
     heroRow: { flexDirection: 'row' },
     heroCell: { flex: 1 },
     heroLabel: {
-      color: colors.primaryText,
-      opacity: 0.85,
-      fontSize: 12,
-      marginBottom: 2,
+      color: colors.textMuted,
+      fontSize: 11,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      marginBottom: 4,
     },
     heroValue: {
-      color: colors.primaryText,
+      color: colors.text,
       fontSize: 16,
-      fontWeight: '700',
+      fontFamily: SERIF_STACK,
     },
   });
