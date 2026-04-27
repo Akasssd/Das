@@ -316,3 +316,70 @@ export const fertileWindowInfo = (
   if (cycleDay > end) return { total, remaining: 0, isInside: false };
   return { total, remaining: end - cycleDay + 1, isInside: true };
 };
+
+export interface CycleHistoryEntry {
+  /** ISO date of the first bleeding day. */
+  start: string;
+  /** ISO date of the last day of the cycle (start of next cycle - 1), or null
+   *  for the still-running cycle. */
+  end: string | null;
+  /** Cycle length in days, or null if it's the current cycle. */
+  cycleLength: number | null;
+  /** Period length in days (consecutive bleeding days from start). */
+  periodLength: number;
+  /** All logs that fall inside this cycle, sorted by date. */
+  logs: DayLog[];
+}
+
+export const computeCycleHistory = (
+  logs: Record<string, DayLog>,
+): CycleHistoryEntry[] => {
+  const starts = findPeriodStarts(logs);
+  if (starts.length === 0) return [];
+  const entries: CycleHistoryEntry[] = [];
+  for (let i = 0; i < starts.length; i++) {
+    const start = starts[i];
+    const nextStart = i < starts.length - 1 ? starts[i + 1] : null;
+    const end =
+      nextStart !== null ? fmt(addDays(parseISO(nextStart), -1)) : null;
+    const cycleLength =
+      nextStart !== null
+        ? differenceInCalendarDays(parseISO(nextStart), parseISO(start))
+        : null;
+
+    let periodLength = 0;
+    let cursor = parseISO(start);
+    while (isBleeding(logs[fmt(cursor)])) {
+      periodLength++;
+      cursor = addDays(cursor, 1);
+      if (periodLength > 14) break;
+    }
+
+    const cycleLogs: DayLog[] = [];
+    const cycleEndIso = end ?? fmt(new Date());
+    for (const [date, log] of Object.entries(logs)) {
+      if (date >= start && date <= cycleEndIso) cycleLogs.push(log);
+    }
+    cycleLogs.sort((a, b) => a.date.localeCompare(b.date));
+
+    entries.push({ start, end, cycleLength, periodLength, logs: cycleLogs });
+  }
+  return entries;
+};
+
+export interface SymptomCount {
+  key: string;
+  count: number;
+}
+
+export const countSymptoms = (
+  logs: Record<string, DayLog>,
+): SymptomCount[] => {
+  const counts: Record<string, number> = {};
+  for (const log of Object.values(logs)) {
+    for (const s of log.symptoms ?? []) counts[s] = (counts[s] ?? 0) + 1;
+  }
+  return Object.entries(counts)
+    .map(([key, count]) => ({ key, count }))
+    .sort((a, b) => b.count - a.count);
+};

@@ -39,6 +39,8 @@ export interface Settings {
   language: 'auto' | 'en' | 'ru';
   theme: 'auto' | 'light' | 'dark';
   showFertileWindow: boolean;
+  notifyPrePeriod: boolean;
+  notifyFertile: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -48,6 +50,8 @@ export const DEFAULT_SETTINGS: Settings = {
   language: 'auto',
   theme: 'light',
   showFertileWindow: true,
+  notifyPrePeriod: false,
+  notifyFertile: false,
 };
 
 export interface Profile {

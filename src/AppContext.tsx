@@ -19,6 +19,7 @@ import { loadData, saveData, clearData as clearStorage } from './storage';
 import { setLocale, t as translate } from './i18n';
 import { ThemeColors, resolveColors } from './theme';
 import { computePredictions, CyclePredictions } from './cycle';
+import { rescheduleNotifications } from './notifications';
 
 interface AppContextValue {
   ready: boolean;
@@ -183,6 +184,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     },
     [language],
   );
+
+  // Keep scheduled local notifications in sync with predictions / settings.
+  useEffect(() => {
+    if (!ready) return;
+    void rescheduleNotifications(predictions, data.settings, translate);
+  }, [
+    ready,
+    predictions,
+    data.settings.notifyPrePeriod,
+    data.settings.notifyFertile,
+    data.settings,
+  ]);
 
   const value = useMemo<AppContextValue>(
     () => ({

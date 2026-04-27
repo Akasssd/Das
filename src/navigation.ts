@@ -2,7 +2,9 @@ export type RootStackParamList = {
   Today: undefined;
   Calendar: undefined;
   DayDetail: { date: string };
-  Stats: undefined;
+  Analytics: undefined;
+  History: undefined;
+  CycleDetail: { start: string };
   Settings: undefined;
   Tabs: undefined;
   CycleWizard: undefined;

@@ -12,7 +12,9 @@ import { AppProvider, useApp } from './src/AppContext';
 import { TodayScreen } from './src/screens/TodayScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
 import { DayDetailScreen } from './src/screens/DayDetailScreen';
-import { StatsScreen } from './src/screens/StatsScreen';
+import { AnalyticsScreen } from './src/screens/AnalyticsScreen';
+import { HistoryScreen } from './src/screens/HistoryScreen';
+import { CycleDetailScreen } from './src/screens/CycleDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { LockScreen } from './src/screens/LockScreen';
@@ -40,11 +42,24 @@ const CalendarTabIcon: React.FC<{ color: string; size: number }> = ({ color, siz
   </Svg>
 );
 
-const StatsIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
+const AnalyticsIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Path d="M5 19V11" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
     <Path d="M12 19V5" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
     <Path d="M19 19v-6" stroke={color} strokeWidth={1.8} strokeLinecap="round" />
+  </Svg>
+);
+
+const HistoryIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M3 12a9 9 0 1 0 3-6.7"
+      stroke={color}
+      strokeWidth={1.6}
+      strokeLinecap="round"
+    />
+    <Path d="M3 4v4h4" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 8v5l3 2" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
   </Svg>
 );
 
@@ -94,11 +109,23 @@ const Tabs: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Stats"
-        component={StatsScreen}
+        name="Analytics"
+        component={AnalyticsScreen}
         options={{
-          title: t('tabs.stats'),
-          tabBarIcon: ({ color, size }) => <StatsIcon color={color} size={size} />,
+          title: t('tabs.analytics'),
+          tabBarIcon: ({ color, size }) => (
+            <AnalyticsIcon color={color} size={size} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="History"
+        component={HistoryScreen}
+        options={{
+          title: t('tabs.history'),
+          tabBarIcon: ({ color, size }) => (
+            <HistoryIcon color={color} size={size} />
+          ),
         }}
       />
       <Tab.Screen
@@ -188,6 +215,11 @@ const RootNavigator: React.FC = () => {
           name="DayDetail"
           component={DayDetailScreen}
           options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="CycleDetail"
+          component={CycleDetailScreen}
+          options={{ title: '', headerShown: false }}
         />
         <Stack.Screen
           name="CycleWizard"

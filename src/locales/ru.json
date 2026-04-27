@@ -5,6 +5,8 @@
   "tabs": {
     "today": "Сегодня",
     "calendar": "Календарь",
+    "analytics": "Аналитика",
+    "history": "История",
     "stats": "Статистика",
     "settings": "Настройки"
   },
@@ -150,6 +152,37 @@
     "wrongPin": "Неверный PIN",
     "unlock": "Открыть"
   },
+  "analytics": {
+    "title": "Аналитика",
+    "forecast": "Прогноз",
+    "nextPeriod": "След. месячные",
+    "nextOvulation": "След. овуляция",
+    "avgCycle": "Средний цикл",
+    "avgPeriod": "Средние месячные",
+    "cycleLengthChartTitle": "Длина циклов, последние 6",
+    "cycleLengthChartHint": "Отметь несколько циклов, чтобы увидеть график.",
+    "symptomsTitle": "Частые симптомы",
+    "symptomsHint": "Добавь симптомы в дневник, чтобы видеть разбивку.",
+    "insufficientData": "Недостаточно данных.",
+    "days": "дн."
+  },
+  "history": {
+    "title": "История циклов",
+    "empty": "Пока ни один цикл не отмечен.",
+    "current": "Текущий цикл",
+    "cycleLength": "Длина цикла",
+    "periodLength": "Месячные",
+    "days": "дн.",
+    "detailTitle": "Детали цикла",
+    "symptomsLogged": "Отмеченные симптомы",
+    "moodsLogged": "Настроение",
+    "notesLogged": "Заметки",
+    "temperatureChart": "Базальная температура",
+    "noTemperature": "БТ в этом цикле не вносилась.",
+    "noSymptoms": "Симптомы не отмечались.",
+    "noNotes": "Заметок нет.",
+    "back": "Назад"
+  },
   "settings": {
     "title": "Настройки",
     "profile": "Профиль",
@@ -174,6 +207,11 @@
     "languageEn": "Английский",
     "languageRu": "Русский",
     "showFertileWindow": "Показывать фертильное окно",
+    "notifications": "Уведомления",
+    "notifyPrePeriod": "Напоминать за день до месячных",
+    "notifyFertile": "Напоминать о фертильном окне",
+    "notifyPermissionDenied": "Разреши уведомления в настройках телефона.",
+    "notifyUnsupportedWeb": "Уведомления работают только в мобильном приложении.",
     "exportData": "Экспорт данных",
     "importData": "Импорт данных",
     "clearData": "Очистить все данные",

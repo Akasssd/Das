@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -272,6 +273,32 @@ export const SettingsScreen: React.FC = () => {
           </View>
         </Section>
 
+        <Section title={t('settings.notifications')} colors={colors}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>
+              {t('settings.notifyPrePeriod')}
+            </Text>
+            <Switch
+              value={data.settings.notifyPrePeriod}
+              onValueChange={(v) => updateSettings({ notifyPrePeriod: v })}
+              trackColor={{ true: colors.primary, false: colors.border }}
+            />
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>{t('settings.notifyFertile')}</Text>
+            <Switch
+              value={data.settings.notifyFertile}
+              onValueChange={(v) => updateSettings({ notifyFertile: v })}
+              trackColor={{ true: colors.primary, false: colors.border }}
+            />
+          </View>
+          {Platform.OS === 'web' ? (
+            <Text style={styles.helper}>
+              {t('settings.notifyUnsupportedWeb')}
+            </Text>
+          ) : null}
+        </Section>
+
         <Pressable style={styles.actionBtn} onPress={handleExport}>
           <Text style={styles.actionBtnText}>{t('settings.exportData')}</Text>
         </Pressable>
@@ -364,6 +391,13 @@ const makeStyles = (colors: ThemeColors) =>
       alignItems: 'center',
     },
     rowLabel: { color: colors.text, fontSize: 16 },
+    helper: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: 6,
+      paddingHorizontal: 4,
+    },
     actionBtn: {
       backgroundColor: colors.primary,
       paddingVertical: 14,
