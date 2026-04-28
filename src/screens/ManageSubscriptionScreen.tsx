@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Alert,
   Linking,
@@ -6,35 +6,23 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format, parseISO } from 'date-fns';
 import { enUS, ru } from 'date-fns/locale';
 
 import { useApp } from '../AppContext';
 import { useSubscription } from '../hooks/useSubscription';
-import { RootStackParamList } from '../navigation';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { ThemeColors } from '../theme';
-
-type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const TELEGRAM_BOT_URL = 'https://t.me/FlowCareBot?start=manage';
 
 export const ManageSubscriptionScreen: React.FC = () => {
   const { colors, t, language } = useApp();
-  const { subscription, tier, isActive, daysLeft, activate, cancel } =
-    useSubscription();
-  const navigation = useNavigation<Nav>();
+  const { subscription, tier, isActive, daysLeft } = useSubscription();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  const [renewCode, setRenewCode] = useState('');
-  const [showRenew, setShowRenew] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const fmtDate = (iso: string | null): string => {
     if (!iso) return '—';
@@ -54,47 +42,10 @@ export const ManageSubscriptionScreen: React.FC = () => {
         ? t('subscription.basicLabel')
         : t('manage.tierFree');
 
-  const onCancel = () => {
-    Alert.alert(t('manage.cancelTitle'), t('manage.cancelBody'), [
-      { text: t('manage.keep'), style: 'cancel' },
-      {
-        text: t('manage.cancelConfirm'),
-        style: 'destructive',
-        onPress: async () => {
-          await cancel();
-          Alert.alert(
-            t('manage.cancelledTitle'),
-            t('manage.cancelledBody'),
-            [
-              { text: t('manage.openBot'), onPress: () => Linking.openURL(TELEGRAM_BOT_URL).catch(() => undefined) },
-              { text: t('manage.ok'), style: 'cancel' },
-            ],
-          );
-          navigation.goBack();
-        },
-      },
-    ]);
-  };
-
-  const onRenew = async () => {
-    const trimmed = renewCode.trim();
-    if (!trimmed) {
-      Alert.alert(t('subscription.codeEmptyTitle'));
-      return;
-    }
-    setBusy(true);
-    const res = await activate(trimmed);
-    setBusy(false);
-    if (!res.ok) {
-      Alert.alert(
-        t('subscription.codeInvalidTitle'),
-        t('subscription.codeInvalidBody'),
-      );
-      return;
-    }
-    setRenewCode('');
-    setShowRenew(false);
-    Alert.alert(t('manage.renewedTitle'), t('manage.renewedBody'));
+  const onOpenBot = () => {
+    Linking.openURL(TELEGRAM_BOT_URL).catch(() => {
+      Alert.alert(t('subscription.botUnavailableTitle'), TELEGRAM_BOT_URL);
+    });
   };
 
   return (
@@ -115,101 +66,40 @@ export const ManageSubscriptionScreen: React.FC = () => {
                 { color: isActive ? colors.primary : colors.textMuted },
               ]}
             >
-              {isActive ? t('manage.statusActive') : t('manage.statusExpired')}
+              {isActive ? t('manage.statusActive') : t('manage.statusInactive')}
             </Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>{t('manage.startedAt')}</Text>
-            <Text style={styles.rowValue}>{fmtDate(subscription.startedAt)}</Text>
-          </View>
-
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>{t('manage.expiresAt')}</Text>
-            <Text style={styles.rowValue}>{fmtDate(subscription.renewsAt)}</Text>
           </View>
 
           {isActive ? (
-            <Text style={styles.daysLeft}>
-              {t('subscription.daysLeft', { n: daysLeft })}
-            </Text>
-          ) : null}
-
-          {subscription.activationCode ? (
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>{t('manage.code')}</Text>
-              <Text style={styles.rowValue} numberOfLines={1}>
-                {subscription.activationCode}
+            <>
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>{t('manage.startedAt')}</Text>
+                <Text style={styles.rowValue}>{fmtDate(subscription.startedAt)}</Text>
+              </View>
+              <View style={styles.row}>
+                <Text style={styles.rowLabel}>{t('manage.expiresAt')}</Text>
+                <Text style={styles.rowValue}>{fmtDate(subscription.renewsAt)}</Text>
+              </View>
+              <Text style={styles.daysLeft}>
+                {t('subscription.daysLeft', { n: daysLeft })}
               </Text>
-            </View>
-          ) : null}
+            </>
+          ) : (
+            <Text style={styles.daysLeft}>{t('manage.inactiveHint')}</Text>
+          )}
         </View>
 
-        {!isActive ? (
-          <Pressable
-            style={[styles.cta, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.ctaText}>{t('manage.viewPlans')}</Text>
-          </Pressable>
-        ) : null}
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>{t('manage.botSectionTitle')}</Text>
+          <Text style={styles.infoBody}>{t('manage.botSectionBody')}</Text>
+        </View>
 
-        {showRenew ? (
-          <View style={styles.codeBlock}>
-            <Text style={styles.codeTitle}>{t('manage.renewTitle')}</Text>
-            <TextInput
-              value={renewCode}
-              onChangeText={setRenewCode}
-              placeholder={t('subscription.codePlaceholder')}
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="characters"
-              autoCorrect={false}
-              style={styles.codeInput}
-            />
-            <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
-              <Pressable
-                style={[
-                  styles.ctaInline,
-                  { backgroundColor: colors.primary },
-                  busy ? { opacity: 0.6 } : null,
-                ]}
-                onPress={onRenew}
-                disabled={busy}
-              >
-                <Text style={styles.ctaText}>{t('subscription.activate')}</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.ctaInline, styles.ctaGhost]}
-                onPress={() => {
-                  setShowRenew(false);
-                  setRenewCode('');
-                }}
-              >
-                <Text style={[styles.ctaText, { color: colors.primary }]}>
-                  {t('manage.keep')}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <Pressable
-            style={[styles.cta, styles.ctaGhost]}
-            onPress={() => setShowRenew(true)}
-          >
-            <Text style={[styles.ctaText, { color: colors.primary }]}>
-              {t('manage.renew')}
-            </Text>
-          </Pressable>
-        )}
-
-        {isActive ? (
-          <Pressable
-            style={[styles.cta, { backgroundColor: colors.danger }]}
-            onPress={onCancel}
-          >
-            <Text style={styles.ctaText}>{t('manage.cancel')}</Text>
-          </Pressable>
-        ) : null}
+        <Pressable
+          style={[styles.cta, { backgroundColor: colors.primary }]}
+          onPress={onOpenBot}
+        >
+          <Text style={styles.ctaText}>{t('manage.openBot')}</Text>
+        </Pressable>
 
         <Text style={styles.disclaimer}>{t('manage.disclaimer')}</Text>
       </ScrollView>
@@ -265,54 +155,37 @@ const makeStyles = (colors: ThemeColors) =>
       marginTop: 8,
       fontStyle: 'italic',
     },
+    infoCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: 12,
+    },
+    infoTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+      fontFamily: SERIF_STACK,
+    },
+    infoBody: {
+      color: colors.textMuted,
+      fontSize: 13,
+      marginTop: 6,
+      lineHeight: 19,
+    },
     cta: {
       paddingVertical: 14,
       borderRadius: 16,
       alignItems: 'center',
-      marginTop: 12,
-    },
-    ctaInline: {
-      flex: 1,
-      paddingVertical: 12,
-      borderRadius: 14,
-      alignItems: 'center',
-    },
-    ctaGhost: {
-      backgroundColor: 'transparent',
-      borderWidth: 1,
-      borderColor: colors.primary,
+      marginTop: 6,
     },
     ctaText: {
       color: '#FFFCF7',
       fontSize: 15,
       fontWeight: '700',
       letterSpacing: 0.3,
-    },
-    codeBlock: {
-      marginTop: 12,
-      padding: 18,
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    codeTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.text,
-      fontFamily: SERIF_STACK,
-    },
-    codeInput: {
-      marginTop: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 16,
-      letterSpacing: 1.5,
-      color: colors.text,
-      backgroundColor: colors.background,
     },
     disclaimer: {
       color: colors.textMuted,

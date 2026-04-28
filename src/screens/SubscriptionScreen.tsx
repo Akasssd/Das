@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   Alert,
   Linking,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,18 +23,25 @@ import { ThemeColors } from '../theme';
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
- * Telegram bot handles payment + delivery onboarding.
+ * Subscription onboarding lives entirely in the Telegram bot
+ * (@FlowCareBot — see ./bot/ in the repo root). The flow:
  *
- * Flow expected from the bot side:
- *   1. /start subscription — shows tariff buttons (Basic 999₽, VIP 1999₽).
- *   2. Bot collects shipping address and box preferences (hygiene types,
- *      allergies, diet, care items) inside the bot — the app does NOT have
- *      these forms.
- *   3. Bot accepts payment (e.g. via Telegram Payments / YooKassa).
- *   4. Bot generates a one-time activation code (BASIC-XXXX or VIP-XXXX) and
- *      sends it back to the user.
- *   5. The user pastes the code into the «Код активации» field below to
- *      unlock the corresponding tier locally for 30 days.
+ *   1. User taps "Оформить через Telegram" — opens
+ *      `https://t.me/FlowCareBot?start=subscription`.
+ *   2. Bot greets the user and asks them to pick a tariff (Basic / VIP).
+ *   3. Bot walks through a 5-step questionnaire:
+ *        a) Hygiene products preference
+ *        b) Allergies / sensitive skin
+ *        c) Diet (regular / PP / vegetarian / vegan / sugar-free)
+ *        d) Care items (masks / patches / tea / cream …)
+ *        e) Notes & favourite scents/brands
+ *   4. Bot collects shipping address.
+ *   5. Bot accepts payment (Telegram Payments / YooKassa) and forwards the
+ *      full order to the admin chat.
+ *
+ * Activation no longer happens in-app via codes — the bot owns the source
+ * of truth. The app will sync subscription state from the bot's API later
+ * (see useSubscription hook for the placeholder).
  */
 const TELEGRAM_BOT_URL = 'https://t.me/FlowCareBot?start=subscription';
 
@@ -51,12 +57,9 @@ interface Tariff {
 
 export const SubscriptionScreen: React.FC = () => {
   const { colors, t, language } = useApp();
-  const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
+  const { subscription, tier, isActive, daysLeft } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
 
   const fmtDate = (iso: string | null): string => {
     if (!iso) return '—';
@@ -105,26 +108,6 @@ export const SubscriptionScreen: React.FC = () => {
     Linking.openURL(TELEGRAM_BOT_URL).catch(() => {
       Alert.alert(t('subscription.botUnavailableTitle'), TELEGRAM_BOT_URL);
     });
-  };
-
-  const onActivate = async () => {
-    const trimmed = code.trim();
-    if (!trimmed) {
-      Alert.alert(t('subscription.codeEmptyTitle'));
-      return;
-    }
-    setBusy(true);
-    const res = await activate(trimmed);
-    setBusy(false);
-    if (!res.ok) {
-      Alert.alert(
-        t('subscription.codeInvalidTitle'),
-        t('subscription.codeInvalidBody'),
-      );
-      return;
-    }
-    setCode('');
-    Alert.alert(t('subscription.activatedTitle'), t('subscription.activatedBody'));
   };
 
   const renderTariffCard = (tariff: Tariff) => {
@@ -205,29 +188,21 @@ export const SubscriptionScreen: React.FC = () => {
 
         {tariffs.map(renderTariffCard)}
 
-        <View style={styles.codeBlock}>
-          <Text style={styles.codeTitle}>{t('subscription.codeTitle')}</Text>
-          <Text style={styles.codeHint}>{t('subscription.codeHint')}</Text>
-          <TextInput
-            value={code}
-            onChangeText={setCode}
-            placeholder={t('subscription.codePlaceholder')}
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            style={styles.codeInput}
-          />
-          <Pressable
-            style={[
-              styles.cta,
-              { backgroundColor: colors.primary },
-              busy ? { opacity: 0.6 } : null,
-            ]}
-            onPress={onActivate}
-            disabled={busy}
-          >
-            <Text style={styles.ctaText}>{t('subscription.activate')}</Text>
-          </Pressable>
+        <View style={styles.howCard}>
+          <Text style={styles.howTitle}>{t('subscription.howTitle')}</Text>
+          {[
+            t('subscription.howStep1'),
+            t('subscription.howStep2'),
+            t('subscription.howStep3'),
+            t('subscription.howStep4'),
+          ].map((step, i) => (
+            <View key={i} style={styles.howRow}>
+              <View style={styles.howNum}>
+                <Text style={styles.howNumText}>{i + 1}</Text>
+              </View>
+              <Text style={styles.howText}>{step}</Text>
+            </View>
+          ))}
         </View>
 
         <Text style={styles.disclaimer}>{t('subscription.disclaimer')}</Text>
@@ -332,7 +307,7 @@ const makeStyles = (colors: ThemeColors) =>
       fontWeight: '700',
       letterSpacing: 0.3,
     },
-    codeBlock: {
+    howCard: {
       marginTop: 8,
       padding: 18,
       backgroundColor: colors.card,
@@ -340,29 +315,37 @@ const makeStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    codeTitle: {
+    howTitle: {
       fontSize: 16,
       fontWeight: '700',
       color: colors.text,
       fontFamily: SERIF_STACK,
+      marginBottom: 8,
     },
-    codeHint: {
-      color: colors.textMuted,
-      fontSize: 13,
-      marginTop: 6,
-      lineHeight: 18,
+    howRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      marginTop: 10,
     },
-    codeInput: {
-      marginTop: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
+    howNum: {
+      width: 24,
+      height: 24,
       borderRadius: 12,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 16,
-      letterSpacing: 1.5,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    howNumText: {
+      color: '#FFFCF7',
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    howText: {
       color: colors.text,
-      backgroundColor: colors.background,
+      fontSize: 14,
+      flex: 1,
+      lineHeight: 20,
     },
     disclaimer: {
       color: colors.textMuted,

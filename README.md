@@ -18,18 +18,16 @@ A privacy-first menstrual cycle tracking app built with **React Native + Expo**.
 - ⚙️ **Settings**: cycle length, period length, luteal-phase length, language (auto / RU / EN), fertile-window visibility, data export, full reset
 - 🌗 **Light & dark themes** (follows iOS system appearance)
 - 🇷🇺🇬🇧 **Russian and English** localization (auto-detected from system locale)
-- 🎁 **Monthly box subscription** (Basic 999 ₽ / VIP 1999 ₽) — payments + delivery onboarding handled by the [@FlowCareBot](https://t.me/FlowCareBot) Telegram bot. The app activates locally via a one-time activation code that the bot sends back after payment.
+- 🎁 **Monthly box subscription** (Basic 999 ₽ / VIP 1999 ₽) — payments, address collection and a 5-step preference questionnaire all live in the **[FlowCare Telegram bot](./bot/README.md)**. The app exposes a marketing-only «Подписка» tab that links into the bot; subscription state syncs back to the app via a future bot API (placeholder hook is already wired up).
 
 ## Subscription flow
 
-1. Open the **Подписка** tab and tap **«Оформить через Telegram»** under either Basic or VIP — this opens `https://t.me/FlowCareBot?start=subscription` so the bot can collect the user's address, hygiene/diet preferences and process payment.
-2. The bot replies with a one-time activation code (e.g. `BASIC-XXXX` or `VIP-XXXX`).
-3. The user pastes the code into the **Код активации** field and taps **Активировать**. The chosen tier becomes active locally for **30 days**.
-4. Subscription state is stored in `AsyncStorage` only — no servers / SDKs. Expiry is checked on cold start (`src/storage.ts:normalize`) and during render (`src/hooks/useSubscription.ts`); when the period ends, the tier auto-resets to free.
+1. User opens the **Подписка** tab in the app and taps **«Оформить через Telegram»** on either tariff card — this opens `https://t.me/FlowCareBot?start=subscription`.
+2. The Telegram bot greets the user and walks them through the questionnaire (hygiene → allergies → diet → care → notes → address → name).
+3. The bot persists the order to `orders.jsonl` and forwards a formatted summary to the admin chat.
+4. Bot accepts payment (Telegram Payments / YooKassa — currently a placeholder) and will push the active tier + `renewsAt` to the app via a small HTTP API once that's wired up. See `TODO(bot-sync)` in [`src/hooks/useSubscription.ts`](src/hooks/useSubscription.ts).
 
-### Test code
-
-For QA / first-launch demos enter `DEMO123` in the activation field. It instantly grants the Basic tier for 30 days without involving the bot. See [`src/utils/activation.ts`](src/utils/activation.ts) for the full code-parsing logic and the bot stub comment in [`src/screens/SubscriptionScreen.tsx`](src/screens/SubscriptionScreen.tsx).
+The bot itself lives in [`./bot/`](./bot/) and is a self-contained Python project — see [`bot/README.md`](./bot/README.md) for setup and deployment instructions.
 
 ## Stack
 
