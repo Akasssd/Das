@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import Svg, { Path, Circle } from 'react-native-svg';
@@ -82,8 +82,11 @@ const SettingsIcon: React.FC<{ color: string; size: number }> = ({ color, size }
 
 const Tabs: React.FC = () => {
   const { colors, t } = useApp();
+  const insets = useSafeAreaInsets();
+  const bottomInset = Math.max(insets.bottom, Platform.OS === 'web' ? 24 : 12);
   return (
     <Tab.Navigator
+      safeAreaInsets={{ bottom: bottomInset }}
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -91,12 +94,11 @@ const Tabs: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
-          height: 86,
-          paddingTop: 10,
-          paddingBottom: 22,
+          height: 60 + bottomInset,
+          paddingTop: 8,
+          paddingBottom: bottomInset,
         },
-        tabBarItemStyle: { paddingVertical: 4 },
-        tabBarLabelStyle: { fontSize: 11, letterSpacing: 0.4, marginTop: 2 },
+        tabBarLabelStyle: { fontSize: 11, letterSpacing: 0.4 },
       }}
     >
       <Tab.Screen
