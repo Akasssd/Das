@@ -10,17 +10,25 @@ import React, {
 import { useColorScheme } from 'react-native';
 import {
   AppData,
+  BoxOrder,
+  BoxProfile,
+  DEFAULT_BOX_PROFILE,
   DEFAULT_PROFILE,
   DEFAULT_SETTINGS,
+  DEFAULT_SUBSCRIPTION,
   DayLog,
+  EMPTY_ADDRESS,
   Profile,
   Settings,
+  ShippingAddress,
+  Subscription,
 } from './types';
 import { loadData, saveData, clearData as clearStorage } from './storage';
 import { setLocale, t as translate } from './i18n';
 import { ThemeColors, resolveColors } from './theme';
 import { computePredictions, CyclePredictions } from './cycle';
 import { rescheduleNotifications } from './notifications';
+import { reconcileOrders } from './utils/delivery';
 
 interface AppContextValue {
   ready: boolean;
@@ -34,6 +42,11 @@ interface AppContextValue {
   updateSettings: (patch: Partial<Settings>) => Promise<void>;
   updateProfile: (patch: Partial<Profile>) => Promise<void>;
   setOnboardingDone: (done: boolean) => Promise<void>;
+  updateSubscription: (patch: Partial<Subscription>) => Promise<void>;
+  updateShippingAddress: (patch: Partial<ShippingAddress>) => Promise<void>;
+  updateBoxProfile: (patch: Partial<BoxProfile>) => Promise<void>;
+  upsertOrder: (order: BoxOrder) => Promise<void>;
+  replaceOrders: (orders: BoxOrder[]) => Promise<void>;
   replaceData: (next: AppData) => Promise<void>;
   resetAll: () => Promise<void>;
   // i18n helpers tied to language so consumers re-render on change
@@ -61,6 +74,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     settings: { ...DEFAULT_SETTINGS },
     profile: { ...DEFAULT_PROFILE },
     onboardingDone: false,
+    subscription: { ...DEFAULT_SUBSCRIPTION },
+    shippingAddress: { ...EMPTY_ADDRESS },
+    boxProfile: { ...DEFAULT_BOX_PROFILE },
+    orders: [],
   });
 
   useEffect(() => {
@@ -170,6 +187,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [persist],
   );
 
+  const updateSubscription = useCallback(
+    async (patch: Partial<Subscription>) => {
+      const current = dataRef.current;
+      const next: AppData = {
+        ...current,
+        subscription: { ...current.subscription, ...patch },
+      };
+      await persist(next);
+    },
+    [persist],
+  );
+
+  const updateShippingAddress = useCallback(
+    async (patch: Partial<ShippingAddress>) => {
+      const current = dataRef.current;
+      const next: AppData = {
+        ...current,
+        shippingAddress: { ...current.shippingAddress, ...patch },
+      };
+      await persist(next);
+    },
+    [persist],
+  );
+
+  const updateBoxProfile = useCallback(
+    async (patch: Partial<BoxProfile>) => {
+      const current = dataRef.current;
+      const next: AppData = {
+        ...current,
+        boxProfile: { ...current.boxProfile, ...patch },
+      };
+      await persist(next);
+    },
+    [persist],
+  );
+
+  const upsertOrder = useCallback(
+    async (order: BoxOrder) => {
+      const current = dataRef.current;
+      const idx = current.orders.findIndex((o) => o.id === order.id);
+      const orders =
+        idx >= 0
+          ? current.orders.map((o, i) => (i === idx ? order : o))
+          : [...current.orders, order];
+      const next: AppData = { ...current, orders };
+      await persist(next);
+    },
+    [persist],
+  );
+
+  const replaceOrders = useCallback(
+    async (orders: BoxOrder[]) => {
+      const current = dataRef.current;
+      const next: AppData = { ...current, orders };
+      await persist(next);
+    },
+    [persist],
+  );
+
   const replaceData = useCallback(
     async (next: AppData) => {
       await persist(next);
@@ -184,6 +260,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       settings: { ...DEFAULT_SETTINGS },
       profile: { ...DEFAULT_PROFILE },
       onboardingDone: false,
+      subscription: { ...DEFAULT_SUBSCRIPTION },
+      shippingAddress: { ...EMPTY_ADDRESS },
+      boxProfile: { ...DEFAULT_BOX_PROFILE },
+      orders: [],
     };
     dataRef.current = fresh;
     setData(fresh);
@@ -220,6 +300,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data.settings,
   ]);
 
+  // Reconcile box orders when subscription / address / next-period prediction
+  // changes: advance statuses by date and create the upcoming order if eligible.
+  useEffect(() => {
+    if (!ready) return;
+    const result = reconcileOrders({
+      subscription: data.subscription,
+      address: data.shippingAddress,
+      nextPeriodStart: predictions.nextPeriodStart,
+      orders: data.orders,
+    });
+    if (result.changed) {
+      const next: AppData = { ...dataRef.current, orders: result.orders };
+      void persist(next);
+    }
+  }, [
+    ready,
+    data.subscription,
+    data.shippingAddress,
+    data.orders,
+    predictions.nextPeriodStart,
+    persist,
+  ]);
+
   const value = useMemo<AppContextValue>(
     () => ({
       ready,
@@ -232,6 +335,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateSettings,
       updateProfile,
       setOnboardingDone,
+      updateSubscription,
+      updateShippingAddress,
+      updateBoxProfile,
+      upsertOrder,
+      replaceOrders,
       replaceData,
       resetAll,
       t,
@@ -248,6 +356,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateSettings,
       updateProfile,
       setOnboardingDone,
+      updateSubscription,
+      updateShippingAddress,
+      updateBoxProfile,
+      upsertOrder,
+      replaceOrders,
       replaceData,
       resetAll,
       t,

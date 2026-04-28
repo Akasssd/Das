@@ -18,6 +18,11 @@ import { CycleDetailScreen } from './src/screens/CycleDetailScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { LockScreen } from './src/screens/LockScreen';
+import { SubscriptionScreen } from './src/screens/SubscriptionScreen';
+import { ManageSubscriptionScreen } from './src/screens/ManageSubscriptionScreen';
+import { AddressScreen } from './src/screens/AddressScreen';
+import { BoxCustomizationScreen } from './src/screens/BoxCustomizationScreen';
+import { OrderStatusScreen } from './src/screens/OrderStatusScreen';
 import { RootStackParamList } from './src/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -232,6 +237,31 @@ const RootNavigator: React.FC = () => {
             />
           )}
         </Stack.Screen>
+        <Stack.Screen
+          name="Subscription"
+          component={SubscriptionScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="ManageSubscription"
+          component={ManageSubscriptionScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="Address"
+          component={AddressScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="BoxCustomization"
+          component={BoxCustomizationScreen}
+          options={{ title: '' }}
+        />
+        <Stack.Screen
+          name="OrderStatus"
+          component={OrderStatusScreen}
+          options={{ title: '' }}
+        />
       </Stack.Navigator>
       <StatusBar style={isDark ? 'light' : 'dark'} />
     </NavigationContainer>

@@ -8,4 +8,9 @@ export type RootStackParamList = {
   Settings: undefined;
   Tabs: undefined;
   CycleWizard: undefined;
+  Subscription: undefined;
+  ManageSubscription: undefined;
+  Address: undefined;
+  BoxCustomization: undefined;
+  OrderStatus: undefined;
 };

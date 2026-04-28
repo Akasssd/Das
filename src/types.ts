@@ -66,11 +66,147 @@ export const DEFAULT_PROFILE: Profile = {
   pinHash: null,
 };
 
+export type SubscriptionTier = 'free' | 'premium' | 'vip';
+
+export interface Subscription {
+  tier: SubscriptionTier;
+  productId: string | null;
+  /** ISO date when the current period started. */
+  startedAt: string | null;
+  /** ISO date for the next billing/renewal cycle. */
+  renewsAt: string | null;
+  /** True after user explicitly cancelled — keeps tier active until renewsAt. */
+  cancelled: boolean;
+  /** Last time the status was synced with the store. */
+  lastSyncedAt: string | null;
+}
+
+export const DEFAULT_SUBSCRIPTION: Subscription = {
+  tier: 'free',
+  productId: null,
+  startedAt: null,
+  renewsAt: null,
+  cancelled: false,
+  lastSyncedAt: null,
+};
+
+export interface ShippingAddress {
+  country: string;
+  city: string;
+  street: string;
+  building: string;
+  apartment: string;
+  postalCode: string;
+  phone: string;
+}
+
+export const EMPTY_ADDRESS: ShippingAddress = {
+  country: '',
+  city: '',
+  street: '',
+  building: '',
+  apartment: '',
+  postalCode: '',
+  phone: '',
+};
+
+export type HygieneType =
+  | 'pads_regular'
+  | 'pads_organic'
+  | 'tampons'
+  | 'cup'
+  | 'period_underwear'
+  | 'none';
+
+export type AllergyKey =
+  | 'chocolate'
+  | 'nuts'
+  | 'gluten'
+  | 'lactose'
+  | 'essential_oils'
+  | 'fragrance'
+  | 'latex';
+
+export type DietKey =
+  | 'regular'
+  | 'healthy'
+  | 'vegetarian'
+  | 'vegan'
+  | 'sugar_free';
+
+export type GoalKey = 'weight_loss' | 'weight_gain' | 'self_care';
+
+export type FlavorKey = 'chocolate' | 'fruits' | 'citrus' | 'mint';
+
+export type CareItem =
+  | 'face_masks'
+  | 'eye_patches'
+  | 'candles'
+  | 'tea'
+  | 'cream'
+  | 'balm'
+  | 'scrub';
+
+export interface BoxProfile {
+  hygieneTypes: HygieneType[];
+  flowIntensity: 'light' | 'medium' | 'heavy' | null;
+  allergies: AllergyKey[];
+  sensitiveSkin: boolean;
+  allergyNotes: string;
+  diet: DietKey | null;
+  goal: GoalKey | null;
+  favoriteFlavors: FlavorKey[];
+  careItems: CareItem[];
+  surpriseGift: boolean;
+  brandPreferences: string;
+  wantsSamples: boolean;
+  notes: string;
+  configured: boolean;
+}
+
+export const DEFAULT_BOX_PROFILE: BoxProfile = {
+  hygieneTypes: [],
+  flowIntensity: null,
+  allergies: [],
+  sensitiveSkin: false,
+  allergyNotes: '',
+  diet: null,
+  goal: null,
+  favoriteFlavors: [],
+  careItems: [],
+  surpriseGift: true,
+  brandPreferences: '',
+  wantsSamples: true,
+  notes: '',
+  configured: false,
+};
+
+export type OrderStatus = 'processing' | 'shipped' | 'delivered' | 'cancelled';
+
+export interface BoxOrder {
+  id: string;
+  /** ISO date when the order was created. */
+  createdAt: string;
+  /** Predicted period start the box was scheduled around. */
+  cycleAnchor: string;
+  /** ISO date the box ships from the warehouse. */
+  shipDate: string;
+  /** ISO date the box is expected to arrive (~3 days after ship). */
+  estimatedDelivery: string;
+  status: OrderStatus;
+  /** Snapshot of address at time of order. */
+  address: ShippingAddress;
+}
+
 export interface AppData {
   logs: Record<string, DayLog>; // keyed by YYYY-MM-DD
   settings: Settings;
   profile: Profile;
   onboardingDone: boolean;
+  subscription: Subscription;
+  shippingAddress: ShippingAddress;
+  boxProfile: BoxProfile;
+  orders: BoxOrder[];
 }
 
 export const SYMPTOMS: SymptomKey[] = [

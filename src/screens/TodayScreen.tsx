@@ -10,7 +10,11 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { addDays, format, parseISO } from 'date-fns';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
+import { useBoxDelivery } from '../hooks/useBoxDelivery';
+import { RootStackParamList } from '../navigation';
 import { tArray } from '../i18n';
 import {
   buildPhaseSegments,
@@ -141,11 +145,15 @@ const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
   </Svg>
 );
 
+type Nav = NativeStackNavigationProp<RootStackParamList>;
+
 export const TodayScreen: React.FC = () => {
   const { data, predictions, colors, t, language, upsertLogs } = useApp();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const navigation = useNavigation<Nav>();
+  const { eligible: vipEligible, hasAddress, activeOrder } = useBoxDelivery();
 
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -284,6 +292,11 @@ export const TodayScreen: React.FC = () => {
       confirmJustSaved={confirmJustSaved}
       onConfirmYes={onConfirmYes}
       onConfirmNo={onConfirmNo}
+      vipEligible={vipEligible}
+      hasAddress={hasAddress}
+      activeOrder={activeOrder}
+      onTapBox={() => navigation.navigate('OrderStatus')}
+      onTapAddress={() => navigation.navigate('Address')}
     />
   );
 };
@@ -308,6 +321,11 @@ interface TodayInnerProps {
   confirmJustSaved: boolean;
   onConfirmYes: () => void;
   onConfirmNo: () => void;
+  vipEligible: boolean;
+  hasAddress: boolean;
+  activeOrder: import('../types').BoxOrder | null;
+  onTapBox: () => void;
+  onTapAddress: () => void;
 }
 
 const TodayInner: React.FC<TodayInnerProps> = ({
@@ -330,6 +348,11 @@ const TodayInner: React.FC<TodayInnerProps> = ({
   confirmJustSaved,
   onConfirmYes,
   onConfirmNo,
+  vipEligible,
+  hasAddress,
+  activeOrder,
+  onTapBox,
+  onTapAddress,
 }) => {
   const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
@@ -406,6 +429,47 @@ const TodayInner: React.FC<TodayInnerProps> = ({
           <View style={styles.ctaWrap}>
             <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
           </View>
+        ) : null}
+
+        {vipEligible && activeOrder && hasAddress ? (
+          <Pressable
+            style={styles.vipCard}
+            onPress={onTapBox}
+          >
+            <View style={styles.vipIconWrap}>
+              <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M3 7.5 12 3l9 4.5v9L12 21 3 16.5v-9Z"
+                  stroke={colors.primary}
+                  strokeWidth={1.5}
+                  strokeLinejoin="round"
+                />
+                <Path d="M3 7.5 12 12l9-4.5" stroke={colors.primary} strokeWidth={1.5} strokeLinejoin="round" />
+                <Path d="M12 12v9" stroke={colors.primary} strokeWidth={1.5} />
+              </Svg>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vipLabel}>{t('today.boxLabel')}</Text>
+              <Text style={styles.vipDate}>
+                {format(parseISO(activeOrder.shipDate), 'd MMM')}
+              </Text>
+              <Text style={styles.vipHint}>
+                {t(`order.status.${activeOrder.status}`)}
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
+
+        {vipEligible && !hasAddress ? (
+          <Pressable
+            style={[styles.vipCard, { backgroundColor: colors.fertile }]}
+            onPress={onTapAddress}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.vipLabel}>{t('today.boxNeedsAddressTitle')}</Text>
+              <Text style={styles.vipHint}>{t('today.boxNeedsAddressHint')}</Text>
+            </View>
+          </Pressable>
         ) : null}
 
         {!isEmpty && showConfirmCard && !confirmJustSaved ? (
@@ -608,6 +672,46 @@ const makeStyles = (colors: ThemeColors) =>
       textAlign: 'center',
       maxWidth: 280,
       lineHeight: 17,
+    },
+    vipCard: {
+      marginTop: 16,
+      marginHorizontal: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: colors.accent,
+    },
+    vipIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    vipLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontWeight: '600',
+    },
+    vipDate: {
+      color: colors.primary,
+      fontSize: 18,
+      fontWeight: '700',
+      marginTop: 2,
+      fontFamily: SERIF,
+    },
+    vipHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      marginTop: 2,
     },
     confirmCard: {
       marginTop: 16,
