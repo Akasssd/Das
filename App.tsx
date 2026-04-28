@@ -91,8 +91,12 @@ const Tabs: React.FC = () => {
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
+          height: 86,
+          paddingTop: 10,
+          paddingBottom: 22,
         },
-        tabBarLabelStyle: { fontSize: 11, letterSpacing: 0.4 },
+        tabBarItemStyle: { paddingVertical: 4 },
+        tabBarLabelStyle: { fontSize: 11, letterSpacing: 0.4, marginTop: 2 },
       }}
     >
       <Tab.Screen
