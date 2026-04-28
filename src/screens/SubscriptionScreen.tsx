@@ -1,138 +1,174 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { format, parseISO } from 'date-fns';
+import { enUS, ru } from 'date-fns/locale';
 
 import { useApp } from '../AppContext';
 import { useSubscription } from '../hooks/useSubscription';
 import { RootStackParamList } from '../navigation';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { ThemeColors } from '../theme';
-import { ProductInfo, listProducts } from '../utils/revenuecat';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+/**
+ * Telegram bot handles payment + delivery onboarding.
+ *
+ * Flow expected from the bot side:
+ *   1. /start subscription — shows tariff buttons (Basic 999₽, VIP 1999₽).
+ *   2. Bot collects shipping address and box preferences (hygiene types,
+ *      allergies, diet, care items) inside the bot — the app does NOT have
+ *      these forms.
+ *   3. Bot accepts payment (e.g. via Telegram Payments / YooKassa).
+ *   4. Bot generates a one-time activation code (BASIC-XXXX or VIP-XXXX) and
+ *      sends it back to the user.
+ *   5. The user pastes the code into the «Код активации» field below to
+ *      unlock the corresponding tier locally for 30 days.
+ */
+const TELEGRAM_BOT_URL = 'https://t.me/FlowCareBot?start=subscription';
+
+interface Tariff {
+  id: 'basic' | 'vip';
+  title: string;
+  price: string;
+  period: string;
+  features: string[];
+  accent: string;
+  highlight: boolean;
+}
+
 export const SubscriptionScreen: React.FC = () => {
-  const { colors, t } = useApp();
-  const { subscription, purchase, restore } = useSubscription();
+  const { colors, t, language } = useApp();
+  const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [products, setProducts] = useState<ProductInfo[]>([]);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    listProducts().then((p) => {
-      if (mounted) setProducts(p);
+  const fmtDate = (iso: string | null): string => {
+    if (!iso) return '—';
+    try {
+      return format(parseISO(iso), 'd MMMM yyyy', {
+        locale: language === 'ru' ? ru : enUS,
+      });
+    } catch {
+      return iso;
+    }
+  };
+
+  const tariffs: Tariff[] = [
+    {
+      id: 'basic',
+      title: t('subscription.basicLabel'),
+      price: t('subscription.basicPrice'),
+      period: t('subscription.perMonth'),
+      features: [
+        t('subscription.basicFeat1'),
+        t('subscription.basicFeat2'),
+        t('subscription.basicFeat3'),
+      ],
+      accent: colors.primary,
+      highlight: false,
+    },
+    {
+      id: 'vip',
+      title: t('subscription.vipLabel'),
+      price: t('subscription.vipPrice'),
+      period: t('subscription.perMonth'),
+      features: [
+        t('subscription.vipFeat1'),
+        t('subscription.vipFeat2'),
+        t('subscription.vipFeat3'),
+        t('subscription.vipFeat4'),
+        t('subscription.vipFeat5'),
+        t('subscription.vipFeat6'),
+      ],
+      accent: '#B5704A',
+      highlight: true,
+    },
+  ];
+
+  const onOpenBot = () => {
+    Linking.openURL(TELEGRAM_BOT_URL).catch(() => {
+      Alert.alert(t('subscription.botUnavailableTitle'), TELEGRAM_BOT_URL);
     });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const onBuy = async (productId: string) => {
-    setBusy(productId);
-    const res = await purchase(productId);
-    setBusy(null);
-    if (!res.ok) {
-      Alert.alert(t('subscription.purchaseFailedTitle'), res.error ?? '');
-      return;
-    }
-    const product = products.find((p) => p.id === productId);
-    if (product?.tier === 'vip') {
-      navigation.navigate('Address');
-    } else {
-      navigation.navigate('ManageSubscription');
-    }
   };
 
-  const onRestore = async () => {
-    setBusy('restore');
-    const res = await restore();
-    setBusy(null);
-    if (!res.ok) {
-      Alert.alert(t('subscription.restoreFailedTitle'), res.error ?? '');
+  const onActivate = async () => {
+    const trimmed = code.trim();
+    if (!trimmed) {
+      Alert.alert(t('subscription.codeEmptyTitle'));
       return;
     }
-    Alert.alert(t('subscription.restoreOkTitle'));
+    setBusy(true);
+    const res = await activate(trimmed);
+    setBusy(false);
+    if (!res.ok) {
+      Alert.alert(
+        t('subscription.codeInvalidTitle'),
+        t('subscription.codeInvalidBody'),
+      );
+      return;
+    }
+    setCode('');
+    Alert.alert(t('subscription.activatedTitle'), t('subscription.activatedBody'));
   };
 
-  const premiumBenefits = [
-    t('subscription.benefitPremium1'),
-    t('subscription.benefitPremium2'),
-    t('subscription.benefitPremium3'),
-    t('subscription.benefitPremium4'),
-  ];
-  const vipBenefits = [
-    t('subscription.benefitVip1'),
-    t('subscription.benefitVip2'),
-    t('subscription.benefitVip3'),
-    t('subscription.benefitVip4'),
-    t('subscription.benefitVip5'),
-  ];
-
-  const renderCard = (
-    product: ProductInfo,
-    benefits: string[],
-    accent: string,
-    label: string,
-    highlight = false,
-  ) => {
-    const isCurrent = subscription.tier === product.tier && !subscription.cancelled;
+  const renderTariffCard = (tariff: Tariff) => {
+    const isCurrent = isActive && tier === tariff.id;
     return (
       <View
-        key={product.id}
+        key={tariff.id}
         style={[
           styles.card,
-          highlight && { borderColor: accent, borderWidth: 1.5 },
+          tariff.highlight && { borderColor: tariff.accent, borderWidth: 1.5 },
         ]}
       >
         <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: accent }]}>{label}</Text>
+          <Text style={[styles.cardTitle, { color: tariff.accent }]}>
+            {tariff.title}
+          </Text>
           {isCurrent ? (
-            <View style={[styles.badge, { backgroundColor: accent }]}>
+            <View style={[styles.badge, { backgroundColor: tariff.accent }]}>
               <Text style={styles.badgeText}>{t('subscription.current')}</Text>
             </View>
           ) : null}
         </View>
         <View style={styles.priceRow}>
-          <Text style={[styles.price, { color: accent }]}>
-            {product.priceLabel}
+          <Text style={[styles.price, { color: tariff.accent }]}>
+            {tariff.price}
           </Text>
-          <Text style={styles.period}>{product.periodLabel}</Text>
+          <Text style={styles.period}>{tariff.period}</Text>
         </View>
         <View style={styles.benefits}>
-          {benefits.map((b, i) => (
+          {tariff.features.map((f, i) => (
             <View key={i} style={styles.benefitRow}>
-              <View style={[styles.benefitDot, { backgroundColor: accent }]} />
-              <Text style={styles.benefitText}>{b}</Text>
+              <View style={[styles.benefitDot, { backgroundColor: tariff.accent }]} />
+              <Text style={styles.benefitText}>{f}</Text>
             </View>
           ))}
         </View>
         <Pressable
-          style={[styles.cta, { backgroundColor: accent }]}
-          onPress={() => onBuy(product.id)}
-          disabled={busy !== null || isCurrent}
+          style={[styles.cta, { backgroundColor: tariff.accent }]}
+          onPress={onOpenBot}
+          disabled={isCurrent}
         >
-          {busy === product.id ? (
-            <ActivityIndicator color={colors.primaryText} />
-          ) : (
-            <Text style={styles.ctaText}>
-              {isCurrent
-                ? t('subscription.activeCta')
-                : t('subscription.subscribeCta')}
-            </Text>
-          )}
+          <Text style={styles.ctaText}>
+            {isCurrent ? t('subscription.activeCta') : t('subscription.subscribeCta')}
+          </Text>
         </Pressable>
       </View>
     );
@@ -145,22 +181,54 @@ export const SubscriptionScreen: React.FC = () => {
         <Text style={styles.h1}>{t('subscription.title')}</Text>
         <Text style={styles.subtitle}>{t('subscription.subtitle')}</Text>
 
-        {products
-          .filter((p) => p.tier === 'premium')
-          .map((p) =>
-            renderCard(p, premiumBenefits, colors.primary, t('subscription.premiumLabel')),
-          )}
-        {products
-          .filter((p) => p.tier === 'vip')
-          .map((p) =>
-            renderCard(p, vipBenefits, '#B5704A', t('subscription.vipLabel'), true),
-          )}
+        {isActive ? (
+          <View style={styles.statusCard}>
+            <Text style={styles.statusLabel}>{t('subscription.activeBanner')}</Text>
+            <Text style={styles.statusTier}>
+              {tier === 'vip' ? t('subscription.vipLabel') : t('subscription.basicLabel')}
+            </Text>
+            <View style={styles.statusRow}>
+              <Text style={styles.statusKey}>{t('subscription.expires')}</Text>
+              <Text style={styles.statusVal}>{fmtDate(subscription.renewsAt)}</Text>
+            </View>
+            <Text style={styles.statusHint}>
+              {t('subscription.daysLeft', { n: daysLeft })}
+            </Text>
+            <Pressable
+              style={[styles.cta, { backgroundColor: colors.primary, marginTop: 14 }]}
+              onPress={() => navigation.navigate('ManageSubscription')}
+            >
+              <Text style={styles.ctaText}>{t('subscription.manage')}</Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-        <Pressable style={styles.linkBtn} onPress={onRestore} disabled={busy !== null}>
-          <Text style={styles.linkText}>
-            {busy === 'restore' ? '…' : t('subscription.restore')}
-          </Text>
-        </Pressable>
+        {tariffs.map(renderTariffCard)}
+
+        <View style={styles.codeBlock}>
+          <Text style={styles.codeTitle}>{t('subscription.codeTitle')}</Text>
+          <Text style={styles.codeHint}>{t('subscription.codeHint')}</Text>
+          <TextInput
+            value={code}
+            onChangeText={setCode}
+            placeholder={t('subscription.codePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            style={styles.codeInput}
+          />
+          <Pressable
+            style={[
+              styles.cta,
+              { backgroundColor: colors.primary },
+              busy ? { opacity: 0.6 } : null,
+            ]}
+            onPress={onActivate}
+            disabled={busy}
+          >
+            <Text style={styles.ctaText}>{t('subscription.activate')}</Text>
+          </Pressable>
+        </View>
 
         <Text style={styles.disclaimer}>{t('subscription.disclaimer')}</Text>
       </ScrollView>
@@ -186,13 +254,47 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: 20,
       lineHeight: 20,
     },
+    statusCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 18,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      marginBottom: 20,
+    },
+    statusLabel: {
+      color: colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
+    statusTier: {
+      color: colors.primary,
+      fontFamily: SERIF_STACK,
+      fontSize: 26,
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    statusRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    statusKey: { color: colors.textMuted, fontSize: 13 },
+    statusVal: { color: colors.text, fontSize: 13, fontWeight: '600' },
+    statusHint: { color: colors.textMuted, fontSize: 12, marginTop: 6 },
     card: {
       backgroundColor: colors.card,
-      borderRadius: 22,
+      borderRadius: 16,
       padding: 18,
       borderWidth: 1,
       borderColor: colors.border,
       marginBottom: 16,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: 6,
+      elevation: 2,
     },
     cardHeader: {
       flexDirection: 'row',
@@ -221,16 +323,51 @@ const makeStyles = (colors: ThemeColors) =>
     cta: {
       marginTop: 18,
       paddingVertical: 14,
-      borderRadius: 999,
+      borderRadius: 16,
       alignItems: 'center',
     },
-    ctaText: { color: '#FFFCF7', fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
-    linkBtn: { alignItems: 'center', paddingVertical: 12 },
-    linkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+    ctaText: {
+      color: '#FFFCF7',
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    codeBlock: {
+      marginTop: 8,
+      padding: 18,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    codeTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.text,
+      fontFamily: SERIF_STACK,
+    },
+    codeHint: {
+      color: colors.textMuted,
+      fontSize: 13,
+      marginTop: 6,
+      lineHeight: 18,
+    },
+    codeInput: {
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      letterSpacing: 1.5,
+      color: colors.text,
+      backgroundColor: colors.background,
+    },
     disclaimer: {
       color: colors.textMuted,
       fontSize: 11,
-      marginTop: 12,
+      marginTop: 16,
       textAlign: 'center',
       lineHeight: 16,
     },

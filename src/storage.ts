@@ -27,25 +27,42 @@ const emptyAppData = (): AppData => ({
   orders: [],
 });
 
-const normalize = (parsed: Partial<AppData>): AppData => ({
-  logs: parsed.logs ?? {},
-  settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
-  profile: { ...DEFAULT_PROFILE, ...(parsed.profile ?? {}) },
-  onboardingDone: Boolean(parsed.onboardingDone),
-  subscription: {
+const normalize = (parsed: Partial<AppData>): AppData => {
+  const rawSub = (parsed.subscription as Partial<Subscription> | undefined) ?? {};
+  // Migrate older 'premium' tier to 'basic'.
+  const tier = rawSub.tier === ('premium' as Subscription['tier']) ? 'basic' : rawSub.tier;
+  const subscription: Subscription = {
     ...DEFAULT_SUBSCRIPTION,
-    ...((parsed.subscription as Partial<Subscription> | undefined) ?? {}),
-  },
-  shippingAddress: {
-    ...EMPTY_ADDRESS,
-    ...((parsed.shippingAddress as Partial<ShippingAddress> | undefined) ?? {}),
-  },
-  boxProfile: {
-    ...DEFAULT_BOX_PROFILE,
-    ...((parsed.boxProfile as Partial<BoxProfile> | undefined) ?? {}),
-  },
-  orders: Array.isArray(parsed.orders) ? parsed.orders : [],
-});
+    ...rawSub,
+    tier: tier ?? DEFAULT_SUBSCRIPTION.tier,
+  };
+  // If a previous expiration date already passed, downgrade to free.
+  if (
+    subscription.tier !== 'free' &&
+    subscription.renewsAt &&
+    new Date(subscription.renewsAt).getTime() < Date.now()
+  ) {
+    subscription.tier = 'free';
+    subscription.activationCode = null;
+    subscription.cancelled = false;
+  }
+  return {
+    logs: parsed.logs ?? {},
+    settings: { ...DEFAULT_SETTINGS, ...(parsed.settings ?? {}) },
+    profile: { ...DEFAULT_PROFILE, ...(parsed.profile ?? {}) },
+    onboardingDone: Boolean(parsed.onboardingDone),
+    subscription,
+    shippingAddress: {
+      ...EMPTY_ADDRESS,
+      ...((parsed.shippingAddress as Partial<ShippingAddress> | undefined) ?? {}),
+    },
+    boxProfile: {
+      ...DEFAULT_BOX_PROFILE,
+      ...((parsed.boxProfile as Partial<BoxProfile> | undefined) ?? {}),
+    },
+    orders: Array.isArray(parsed.orders) ? parsed.orders : [],
+  };
+};
 
 export const loadData = async (): Promise<AppData> => {
   try {

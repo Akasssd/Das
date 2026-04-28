@@ -13,7 +13,7 @@ import { addDays, format, parseISO } from 'date-fns';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
-import { useBoxDelivery } from '../hooks/useBoxDelivery';
+import { useSubscription } from '../hooks/useSubscription';
 import { RootStackParamList } from '../navigation';
 import { tArray } from '../i18n';
 import {
@@ -153,7 +153,15 @@ export const TodayScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
-  const { eligible: vipEligible, hasAddress, activeOrder } = useBoxDelivery();
+  const { isVip } = useSubscription();
+  const vipShipDate = useMemo(() => {
+    if (!isVip || !predictions.nextPeriodStart) return null;
+    try {
+      return addDays(parseISO(predictions.nextPeriodStart), -5);
+    } catch {
+      return null;
+    }
+  }, [isVip, predictions.nextPeriodStart]);
 
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -292,11 +300,9 @@ export const TodayScreen: React.FC = () => {
       confirmJustSaved={confirmJustSaved}
       onConfirmYes={onConfirmYes}
       onConfirmNo={onConfirmNo}
-      vipEligible={vipEligible}
-      hasAddress={hasAddress}
-      activeOrder={activeOrder}
-      onTapBox={() => navigation.navigate('OrderStatus')}
-      onTapAddress={() => navigation.navigate('Address')}
+      isVip={isVip}
+      vipShipDate={vipShipDate}
+      onTapBox={() => navigation.navigate('Subscription' as never)}
     />
   );
 };
@@ -321,11 +327,9 @@ interface TodayInnerProps {
   confirmJustSaved: boolean;
   onConfirmYes: () => void;
   onConfirmNo: () => void;
-  vipEligible: boolean;
-  hasAddress: boolean;
-  activeOrder: import('../types').BoxOrder | null;
+  isVip: boolean;
+  vipShipDate: Date | null;
   onTapBox: () => void;
-  onTapAddress: () => void;
 }
 
 const TodayInner: React.FC<TodayInnerProps> = ({
@@ -348,11 +352,9 @@ const TodayInner: React.FC<TodayInnerProps> = ({
   confirmJustSaved,
   onConfirmYes,
   onConfirmNo,
-  vipEligible,
-  hasAddress,
-  activeOrder,
+  isVip,
+  vipShipDate,
   onTapBox,
-  onTapAddress,
 }) => {
   const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
@@ -431,11 +433,8 @@ const TodayInner: React.FC<TodayInnerProps> = ({
           </View>
         ) : null}
 
-        {vipEligible && activeOrder && hasAddress ? (
-          <Pressable
-            style={styles.vipCard}
-            onPress={onTapBox}
-          >
+        {isVip && vipShipDate ? (
+          <Pressable style={styles.vipCard} onPress={onTapBox}>
             <View style={styles.vipIconWrap}>
               <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
                 <Path
@@ -450,24 +449,8 @@ const TodayInner: React.FC<TodayInnerProps> = ({
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.vipLabel}>{t('today.boxLabel')}</Text>
-              <Text style={styles.vipDate}>
-                {format(parseISO(activeOrder.shipDate), 'd MMM')}
-              </Text>
-              <Text style={styles.vipHint}>
-                {t(`order.status.${activeOrder.status}`)}
-              </Text>
-            </View>
-          </Pressable>
-        ) : null}
-
-        {vipEligible && !hasAddress ? (
-          <Pressable
-            style={[styles.vipCard, { backgroundColor: colors.fertile }]}
-            onPress={onTapAddress}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={styles.vipLabel}>{t('today.boxNeedsAddressTitle')}</Text>
-              <Text style={styles.vipHint}>{t('today.boxNeedsAddressHint')}</Text>
+              <Text style={styles.vipDate}>{format(vipShipDate, 'd MMM')}</Text>
+              <Text style={styles.vipHint}>{t('today.boxHint')}</Text>
             </View>
           </Pressable>
         ) : null}

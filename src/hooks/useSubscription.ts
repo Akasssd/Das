@@ -1,19 +1,23 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useApp } from '../AppContext';
 import { Subscription, SubscriptionTier } from '../types';
 import {
-  markCancelled,
-  purchaseProduct as rcPurchase,
-  restorePurchases as rcRestore,
-} from '../utils/revenuecat';
+  cancelSubscription,
+  daysLeft as computeDaysLeft,
+  isActive as computeIsActive,
+  redeemCode,
+} from '../utils/activation';
 
 export interface UseSubscriptionApi {
   subscription: Subscription;
   tier: SubscriptionTier;
-  isPremium: boolean;
+  isActive: boolean;
+  isBasic: boolean;
   isVip: boolean;
-  purchase: (productId: string) => Promise<{ ok: boolean; error?: string }>;
-  restore: () => Promise<{ ok: boolean; error?: string }>;
+  daysLeft: number;
+  /** Try to redeem an activation code (e.g. DEMO123). Persists on success. */
+  activate: (code: string) => Promise<{ ok: boolean; error?: 'empty' | 'invalid' }>;
+  /** Reset subscription back to free. */
   cancel: () => Promise<void>;
 }
 
@@ -21,38 +25,38 @@ export const useSubscription = (): UseSubscriptionApi => {
   const { data, updateSubscription } = useApp();
   const sub = data.subscription;
 
-  const purchase = useCallback(
-    async (productId: string) => {
-      const res = await rcPurchase(productId);
-      if (!res.ok) return { ok: false, error: res.errorMessage };
-      if (res.subscription) {
-        await updateSubscription(res.subscription);
-      }
+  // Auto-downgrade on expiry the next time the screen renders. Storage's
+  // normalize() handles this on cold start; this covers long-running sessions.
+  useEffect(() => {
+    if (sub.tier !== 'free' && sub.renewsAt && !computeIsActive(sub)) {
+      void updateSubscription({ ...cancelSubscription() });
+    }
+  }, [sub, updateSubscription]);
+
+  const activate = useCallback(
+    async (code: string) => {
+      const res = redeemCode(code);
+      if (!res.ok) return { ok: false, error: res.error };
+      await updateSubscription(res.subscription);
       return { ok: true };
     },
     [updateSubscription],
   );
 
-  const restore = useCallback(async () => {
-    const res = await rcRestore();
-    if (!res.ok) return { ok: false, error: res.errorMessage };
-    if (res.subscription) {
-      await updateSubscription(res.subscription);
-    }
-    return { ok: true };
+  const cancel = useCallback(async () => {
+    await updateSubscription(cancelSubscription());
   }, [updateSubscription]);
 
-  const cancel = useCallback(async () => {
-    await updateSubscription(markCancelled(sub));
-  }, [sub, updateSubscription]);
+  const active = computeIsActive(sub);
 
   return {
     subscription: sub,
     tier: sub.tier,
-    isPremium: sub.tier === 'premium' || sub.tier === 'vip',
-    isVip: sub.tier === 'vip',
-    purchase,
-    restore,
+    isActive: active,
+    isBasic: active && sub.tier === 'basic',
+    isVip: active && sub.tier === 'vip',
+    daysLeft: computeDaysLeft(sub),
+    activate,
     cancel,
   };
 };

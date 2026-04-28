@@ -20,9 +20,6 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { LockScreen } from './src/screens/LockScreen';
 import { SubscriptionScreen } from './src/screens/SubscriptionScreen';
 import { ManageSubscriptionScreen } from './src/screens/ManageSubscriptionScreen';
-import { AddressScreen } from './src/screens/AddressScreen';
-import { BoxCustomizationScreen } from './src/screens/BoxCustomizationScreen';
-import { OrderStatusScreen } from './src/screens/OrderStatusScreen';
 import { RootStackParamList } from './src/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -75,6 +72,25 @@ const SettingsIcon: React.FC<{ color: string; size: number }> = ({ color, size }
       d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8L4.2 7a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"
       stroke={color}
       strokeWidth={1.3}
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const GiftTabIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M4 11h16v9a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-9Z"
+      stroke={color}
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    />
+    <Path d="M3 7h18v4H3z" stroke={color} strokeWidth={1.5} strokeLinejoin="round" />
+    <Path d="M12 7v14" stroke={color} strokeWidth={1.5} />
+    <Path
+      d="M12 7c-1.5-3-5-3-5-1s2 1 5 1Zm0 0c1.5-3 5-3 5-1s-2 1-5 1Z"
+      stroke={color}
+      strokeWidth={1.5}
       strokeLinejoin="round"
     />
   </Svg>
@@ -137,6 +153,14 @@ const Tabs: React.FC = () => {
           tabBarIcon: ({ color, size }) => (
             <HistoryIcon color={color} size={size} />
           ),
+        }}
+      />
+      <Tab.Screen
+        name="Subscription"
+        component={SubscriptionScreen}
+        options={{
+          title: t('tabs.subscription'),
+          tabBarIcon: ({ color, size }) => <GiftTabIcon color={color} size={size} />,
         }}
       />
       <Tab.Screen
@@ -244,28 +268,8 @@ const RootNavigator: React.FC = () => {
           )}
         </Stack.Screen>
         <Stack.Screen
-          name="Subscription"
-          component={SubscriptionScreen}
-          options={{ title: '' }}
-        />
-        <Stack.Screen
           name="ManageSubscription"
           component={ManageSubscriptionScreen}
-          options={{ title: '' }}
-        />
-        <Stack.Screen
-          name="Address"
-          component={AddressScreen}
-          options={{ title: '' }}
-        />
-        <Stack.Screen
-          name="BoxCustomization"
-          component={BoxCustomizationScreen}
-          options={{ title: '' }}
-        />
-        <Stack.Screen
-          name="OrderStatus"
-          component={OrderStatusScreen}
           options={{ title: '' }}
         />
       </Stack.Navigator>

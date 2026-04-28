@@ -22,7 +22,6 @@ import { hashPin } from '../pin';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { ThemeColors } from '../theme';
 import { useSubscription } from '../hooks/useSubscription';
-import { useBoxDelivery } from '../hooks/useBoxDelivery';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -32,8 +31,7 @@ export const SettingsScreen: React.FC = () => {
   const { data, updateSettings, updateProfile, resetAll, colors, t } = useApp();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { tier, isVip } = useSubscription();
-  const { hasAddress, hasBoxProfile } = useBoxDelivery();
+  const { tier, isActive } = useSubscription();
   const [cycleLen, setCycleLen] = useState(String(data.settings.averageCycleLength));
   const [periodLen, setPeriodLen] = useState(
     String(data.settings.averagePeriodLength),
@@ -152,57 +150,27 @@ export const SettingsScreen: React.FC = () => {
             <Text style={{ color: colors.primary, fontWeight: '700' }}>
               {tier === 'vip'
                 ? t('subscription.vipLabel')
-                : tier === 'premium'
-                  ? t('subscription.premiumLabel')
+                : tier === 'basic'
+                  ? t('subscription.basicLabel')
                   : t('manage.tierFree')}
             </Text>
           </View>
           <Pressable
             style={[styles.actionBtn, { marginTop: 12 }]}
-            onPress={() =>
-              navigation.navigate(
-                tier === 'free' ? 'Subscription' : 'ManageSubscription',
-              )
-            }
+            onPress={() => {
+              if (isActive) {
+                navigation.navigate('ManageSubscription');
+              } else {
+                navigation.navigate('Subscription' as never);
+              }
+            }}
           >
             <Text style={styles.actionBtnText}>
-              {tier === 'free'
-                ? t('settings.openPaywall')
-                : t('settings.manageSubscription')}
+              {isActive
+                ? t('settings.manageSubscription')
+                : t('settings.openPaywall')}
             </Text>
           </Pressable>
-          {isVip ? (
-            <>
-              <Pressable
-                style={[styles.actionBtn, { marginTop: 8 }]}
-                onPress={() => navigation.navigate('Address')}
-              >
-                <Text style={styles.actionBtnText}>
-                  {hasAddress
-                    ? t('settings.editAddress')
-                    : t('settings.fillAddress')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, { marginTop: 8 }]}
-                onPress={() => navigation.navigate('BoxCustomization')}
-              >
-                <Text style={styles.actionBtnText}>
-                  {hasBoxProfile
-                    ? t('settings.editBoxProfile')
-                    : t('settings.setupBox')}
-                </Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, { marginTop: 8 }]}
-                onPress={() => navigation.navigate('OrderStatus')}
-              >
-                <Text style={styles.actionBtnText}>
-                  {t('settings.orderStatus')}
-                </Text>
-              </Pressable>
-            </>
-          ) : null}
         </Section>
 
         <Section title={t('settings.pinTitle')} colors={colors}>

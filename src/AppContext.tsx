@@ -28,7 +28,6 @@ import { setLocale, t as translate } from './i18n';
 import { ThemeColors, resolveColors } from './theme';
 import { computePredictions, CyclePredictions } from './cycle';
 import { rescheduleNotifications } from './notifications';
-import { reconcileOrders } from './utils/delivery';
 
 interface AppContextValue {
   ready: boolean;
@@ -300,28 +299,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data.settings,
   ]);
 
-  // Reconcile box orders when subscription / address / next-period prediction
-  // changes: advance statuses by date and create the upcoming order if eligible.
-  useEffect(() => {
-    if (!ready) return;
-    const result = reconcileOrders({
-      subscription: data.subscription,
-      address: data.shippingAddress,
-      nextPeriodStart: predictions.nextPeriodStart,
-      orders: data.orders,
-    });
-    if (result.changed) {
-      const next: AppData = { ...dataRef.current, orders: result.orders };
-      void persist(next);
-    }
-  }, [
-    ready,
-    data.subscription,
-    data.shippingAddress,
-    data.orders,
-    predictions.nextPeriodStart,
-    persist,
-  ]);
+  // Subscription is now activated locally via Telegram-bot-issued codes
+  // (see src/utils/activation.ts); shipping/orders are tracked by the bot,
+  // so the app no longer reconciles BoxOrders here. Auto-expiry on cold
+  // start is handled in storage.ts:normalize().
 
   const value = useMemo<AppContextValue>(
     () => ({

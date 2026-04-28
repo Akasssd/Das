@@ -66,19 +66,21 @@ export const DEFAULT_PROFILE: Profile = {
   pinHash: null,
 };
 
-export type SubscriptionTier = 'free' | 'premium' | 'vip';
+export type SubscriptionTier = 'free' | 'basic' | 'vip';
 
 export interface Subscription {
   tier: SubscriptionTier;
   productId: string | null;
   /** ISO date when the current period started. */
   startedAt: string | null;
-  /** ISO date for the next billing/renewal cycle. */
+  /** ISO date for the next billing/renewal cycle (= expiration when activated by code). */
   renewsAt: string | null;
   /** True after user explicitly cancelled — keeps tier active until renewsAt. */
   cancelled: boolean;
   /** Last time the status was synced with the store. */
   lastSyncedAt: string | null;
+  /** Activation code redeemed (when subscription is activated via Telegram bot). */
+  activationCode: string | null;
 }
 
 export const DEFAULT_SUBSCRIPTION: Subscription = {
@@ -88,6 +90,7 @@ export const DEFAULT_SUBSCRIPTION: Subscription = {
   renewsAt: null,
   cancelled: false,
   lastSyncedAt: null,
+  activationCode: null,
 };
 
 export interface ShippingAddress {
