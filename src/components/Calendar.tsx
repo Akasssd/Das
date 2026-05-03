@@ -10,7 +10,6 @@ import {
   endOfMonth,
   format,
   isSameDay,
-  parseISO,
   startOfMonth,
 } from 'date-fns';
 import { useApp } from '../AppContext';
@@ -26,8 +25,7 @@ interface Props {
 const buildMonthGrid = (anchor: Date): (Date | null)[] => {
   const start = startOfMonth(anchor);
   const end = endOfMonth(anchor);
-  // Monday-based week (1..7 with 1=Mon)
-  const startDow = ((start.getDay() + 6) % 7); // 0=Mon
+  const startDow = (start.getDay() + 6) % 7;
   const cells: (Date | null)[] = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
   for (let d = 1; d <= end.getDate(); d++) {
@@ -48,7 +46,6 @@ export const CalendarView: React.FC<Props> = ({
   const cells = useMemo(() => buildMonthGrid(anchor), [anchor]);
   const markers = useMemo(
     () => buildDayMarkers(data.logs, predictions, data.settings, today),
-    // language is not actually needed here, but ensures re-render on locale change
     [data.logs, predictions, data.settings, today, language],
   );
 
@@ -92,11 +89,29 @@ export const CalendarView: React.FC<Props> = ({
           const dateStr = fmt(cell);
           const dayMarkers = markers[dateStr] ?? [];
           const isToday = isSameDay(cell, today);
+          const hasOvulation = dayMarkers.includes('ovulation');
+          const hasFertile = dayMarkers.includes('fertile');
+          const hasPredicted = dayMarkers.includes('predictedPeriod');
           return (
             <Pressable
               key={dateStr}
               onPress={() => onSelectDay(dateStr)}
-              style={[styles.cell, dayCellStyle(dayMarkers, colors, isToday)]}
+              style={[
+                styles.cell,
+                dayCellStyle(dayMarkers, colors, isToday),
+                hasFertile && styles.fertileCell,
+                hasOvulation && {
+                  borderColor: colors.ovulation,
+                  borderWidth: 2,
+                  backgroundColor: colors.ovulation,
+                  shadowColor: colors.ovulation,
+                  shadowOpacity: 0.35,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 2 },
+                  elevation: 3,
+                },
+                hasPredicted && !hasOvulation && styles.ringCell,
+              ]}
               accessibilityLabel={dateStr}
             >
               <Text style={dayTextStyle(dayMarkers, colors, isToday)}>
@@ -108,9 +123,14 @@ export const CalendarView: React.FC<Props> = ({
                     style={[styles.dot, { backgroundColor: colors.accent }]}
                   />
                 )}
-                {dayMarkers.includes('ovulation') && (
+                {hasFertile && !hasOvulation && (
                   <View
-                    style={[styles.dot, { backgroundColor: colors.ovulation }]}
+                    style={[styles.dot, { backgroundColor: colors.fertile }]}
+                  />
+                )}
+                {hasOvulation && (
+                  <View
+                    style={[styles.dot, { backgroundColor: colors.primary }]} 
                   />
                 )}
               </View>
@@ -140,7 +160,11 @@ const dayCellStyle = (
     };
   }
   if (markers.includes('fertile')) {
-    return { backgroundColor: colors.fertile };
+    return {
+      backgroundColor: colors.fertile,
+      borderColor: colors.fertile,
+      borderWidth: 1,
+    };
   }
   if (isToday) {
     return { borderColor: colors.today, borderWidth: 1 };
@@ -156,11 +180,14 @@ const dayTextStyle = (
   if (markers.includes('period')) {
     return { color: colors.primaryText, fontWeight: '700' as const };
   }
+  if (markers.includes('ovulation')) {
+    return { color: colors.text, fontWeight: '800' as const };
+  }
   if (markers.includes('predictedPeriod')) {
     return { color: '#D64545', fontWeight: '700' as const };
   }
   if (markers.includes('fertile')) {
-    return { color: colors.text, fontWeight: '600' as const };
+    return { color: colors.text, fontWeight: '700' as const };
   }
   if (isToday) {
     return { color: colors.today, fontWeight: '700' as const };
@@ -179,7 +206,7 @@ const Legend: React.FC<LegendProps> = ({ colors, t }) => {
     { color: colors.period, label: t('home.lastPeriod') },
     { color: '#D64545', label: t('home.nextPeriod'), ring: true },
     { color: colors.fertile, label: t('home.fertileWindow') },
-    { color: colors.ovulation, label: t('home.ovulation') },
+    { color: colors.ovulation, label: t('home.ovulation'), ring: true },
   ];
   return (
     <View style={styles.legend}>
@@ -248,6 +275,15 @@ const makeStyles = (colors: ReturnType<typeof useApp>['colors']) =>
       justifyContent: 'center',
       borderRadius: 12,
       marginVertical: 2,
+    },
+    fertileCell: {
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 1 },
+      elevation: 1,
+    },
+    ringCell: {
+      borderRadius: 12,
     },
     dotsRow: {
       flexDirection: 'row',

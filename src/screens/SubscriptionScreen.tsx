@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format, parseISO } from 'date-fns';
-import { enUS, ru } from 'date-fns/locale';
+import { ru } from 'date-fns/locale';
 
 import { useApp } from '../AppContext';
 import { useSubscription } from '../hooks/useSubscription';
@@ -23,41 +23,56 @@ import { ThemeColors } from '../theme';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
-/**
- * Subscription onboarding lives entirely in the Telegram bot
- * (@lowerBsk24_bot — see ./bot/ in the repo root). The flow:
- *
- *   1. User taps "Оформить через Telegram" — opens
- *      `https://t.me/lowerBsk24_bot?start=subscription`.
- *   2. Bot greets the user and asks them to pick a tariff (Basic / VIP).
- *   3. Bot walks through a 5-step questionnaire:
- *        a) Hygiene products preference
- *        b) Allergies / sensitive skin
- *        c) Diet (regular / PP / vegetarian / vegan / sugar-free)
- *        d) Care items (masks / patches / tea / cream …)
- *        e) Notes & favourite scents/brands
- *   4. Bot collects shipping address.
- *   5. Bot accepts payment (Telegram Payments / YooKassa) and forwards the
- *      full order to the admin chat.
- *
- * Activation no longer happens in-app via codes — the bot owns the source
- * of truth. The app will sync subscription state from the bot's API later
- * (see useSubscription hook for the placeholder).
- */
 const TELEGRAM_BOT_URL = 'https://t.me/lowerBsk24_bot?start=subscription';
+const BUTTON_ACCENT = '#8267E6';
 
-interface Tariff {
-  id: 'basic' | 'vip';
+interface MysteryTierCardProps {
   title: string;
   price: string;
-  period: string;
-  features: string[];
-  accent: string;
-  highlight: boolean;
+  body: string;
+  buttonLabel: string;
+  tint: string;
+  glow: string;
+  active?: boolean;
+  onPress: () => void;
 }
 
+const MysteryTierCard: React.FC<MysteryTierCardProps> = ({
+  title,
+  price,
+  body,
+  buttonLabel,
+  tint,
+  glow,
+  active,
+  onPress,
+}) => {
+  return (
+    <View
+      style={[
+        stylesShared.card,
+        {
+          backgroundColor: tint,
+          shadowColor: glow,
+          borderColor: active ? BUTTON_ACCENT : 'rgba(255,255,255,0.35)',
+          borderWidth: active ? 1.5 : 1,
+        },
+      ]}
+    >
+      <View style={stylesShared.cardTopRow}>
+        <Text style={stylesShared.cardTitle}>{title}</Text>
+        <Text style={stylesShared.cardPrice}>{price}</Text>
+      </View>
+      <Text style={stylesShared.cardBody}>{body}</Text>
+      <Pressable style={stylesShared.cardButton} onPress={onPress}>
+        <Text style={stylesShared.cardButtonText}>{buttonLabel}</Text>
+      </Pressable>
+    </View>
+  );
+};
+
 export const SubscriptionScreen: React.FC = () => {
-  const { colors, t, language } = useApp();
+  const { colors } = useApp();
   const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -67,49 +82,15 @@ export const SubscriptionScreen: React.FC = () => {
   const fmtDate = (iso: string | null): string => {
     if (!iso) return '—';
     try {
-      return format(parseISO(iso), 'd MMMM yyyy', {
-        locale: language === 'ru' ? ru : enUS,
-      });
+      return format(parseISO(iso), 'd MMMM yyyy', { locale: ru });
     } catch {
       return iso;
     }
   };
 
-  const tariffs: Tariff[] = [
-    {
-      id: 'basic',
-      title: t('subscription.basicLabel'),
-      price: t('subscription.basicPrice'),
-      period: t('subscription.perMonth'),
-      features: [
-        t('subscription.basicFeat1'),
-        t('subscription.basicFeat2'),
-        t('subscription.basicFeat3'),
-      ],
-      accent: colors.primary,
-      highlight: false,
-    },
-    {
-      id: 'vip',
-      title: t('subscription.vipLabel'),
-      price: t('subscription.vipPrice'),
-      period: t('subscription.perMonth'),
-      features: [
-        t('subscription.vipFeat1'),
-        t('subscription.vipFeat2'),
-        t('subscription.vipFeat3'),
-        t('subscription.vipFeat4'),
-        t('subscription.vipFeat5'),
-        t('subscription.vipFeat6'),
-      ],
-      accent: '#B5704A',
-      highlight: true,
-    },
-  ];
-
-  const onOpenBot = () => {
+  const openBot = () => {
     Linking.openURL(TELEGRAM_BOT_URL).catch(() => {
-      Alert.alert(t('subscription.botUnavailableTitle'), TELEGRAM_BOT_URL);
+      Alert.alert('Не получилось открыть Telegram', TELEGRAM_BOT_URL);
     });
   };
 
@@ -120,325 +101,263 @@ export const SubscriptionScreen: React.FC = () => {
       if (res.ok) {
         setCode('');
         Alert.alert(
-          t('subscription.activatedTitle'),
-          t('subscription.activatedBody', {
-            tier:
-              res.tier === 'vip'
-                ? t('subscription.vipLabel')
-                : t('subscription.basicLabel'),
-            expires: fmtDate(`${res.expires}T00:00:00.000Z`),
-          }),
+          'Подписка активирована',
+          `Тариф: ${res.tier === 'vip' ? 'Полная симфония' : 'Твой ритм'}. Действует до ${fmtDate(`${res.expires}T00:00:00.000Z`)}.`,
         );
-      } else if (res.reason === 'empty') {
-        Alert.alert(t('subscription.codeEmptyTitle'), t('subscription.codeEmptyBody'));
-      } else {
-        Alert.alert(t('subscription.codeInvalidTitle'), t('subscription.codeInvalidBody'));
+        return;
       }
+      if (res.reason === 'empty') {
+        Alert.alert('Введи код', 'Скопируй код из сообщения бота и вставь сюда.');
+        return;
+      }
+      Alert.alert(
+        'Код не найден',
+        'Проверь, что ввела код полностью и без пробелов. Если код правильный — напиши боту.',
+      );
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const renderTariffCard = (tariff: Tariff) => {
-    const isCurrent = isActive && tier === tariff.id;
-    return (
-      <View
-        key={tariff.id}
-        style={[
-          styles.card,
-          tariff.highlight && { borderColor: tariff.accent, borderWidth: 1.5 },
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={[styles.cardTitle, { color: tariff.accent }]}>
-            {tariff.title}
-          </Text>
-          {isCurrent ? (
-            <View style={[styles.badge, { backgroundColor: tariff.accent }]}>
-              <Text style={styles.badgeText}>{t('subscription.current')}</Text>
-            </View>
-          ) : null}
-        </View>
-        <View style={styles.priceRow}>
-          <Text style={[styles.price, { color: tariff.accent }]}>
-            {tariff.price}
-          </Text>
-          <Text style={styles.period}>{tariff.period}</Text>
-        </View>
-        <View style={styles.benefits}>
-          {tariff.features.map((f, i) => (
-            <View key={i} style={styles.benefitRow}>
-              <View style={[styles.benefitDot, { backgroundColor: tariff.accent }]} />
-              <Text style={styles.benefitText}>{f}</Text>
-            </View>
-          ))}
-        </View>
-        <Pressable
-          style={[styles.cta, { backgroundColor: tariff.accent }]}
-          onPress={onOpenBot}
-          disabled={isCurrent}
-        >
-          <Text style={styles.ctaText}>
-            {isCurrent ? t('subscription.activeCta') : t('subscription.subscribeCta')}
-          </Text>
-        </Pressable>
-      </View>
-    );
   };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <WaveBackground colors={colors} />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.h1}>{t('subscription.title')}</Text>
-        <Text style={styles.subtitle}>{t('subscription.subtitle')}</Text>
+        <Text style={styles.title}>Твоя тайная коробка заботы</Text>
+        <Text style={styles.subtitle}>Мы узнали тебя. Теперь доверься нам.</Text>
 
         {isActive ? (
           <View style={styles.statusCard}>
-            <Text style={styles.statusLabel}>{t('subscription.activeBanner')}</Text>
-            <Text style={styles.statusTier}>
-              {tier === 'vip' ? t('subscription.vipLabel') : t('subscription.basicLabel')}
+            <Text style={styles.statusEyebrow}>Подписка активна</Text>
+            <Text style={styles.statusTitle}>
+              {tier === 'vip' ? 'Полная симфония' : 'Твой ритм'}
             </Text>
             <View style={styles.statusRow}>
-              <Text style={styles.statusKey}>{t('subscription.expires')}</Text>
+              <Text style={styles.statusKey}>Действует до</Text>
               <Text style={styles.statusVal}>{fmtDate(subscription.renewsAt)}</Text>
             </View>
-            <Text style={styles.statusHint}>
-              {t('subscription.daysLeft', { n: daysLeft })}
-            </Text>
+            <Text style={styles.statusHint}>Осталось дней: {daysLeft}</Text>
             <Pressable
-              style={[styles.cta, { backgroundColor: colors.primary, marginTop: 14 }]}
+              style={styles.manageButton}
               onPress={() => navigation.navigate('ManageSubscription')}
             >
-              <Text style={styles.ctaText}>{t('subscription.manage')}</Text>
+              <Text style={styles.manageButtonText}>Управление</Text>
             </Pressable>
           </View>
         ) : null}
 
-        {tariffs.map(renderTariffCard)}
+        <MysteryTierCard
+          title="Твой ритм"
+          price="999₽/мес"
+          tint={colors.card}
+          glow="#D8BDEB"
+          active={isActive && tier === 'basic'}
+          body="Каждый месяц перед началом цикла курьер приносит загадочную коробку. Внутри – твои выбранные средства гигиены, вкусный комплимент и ритуал ухода. Состав меняется, опираясь на твой профиль, аллергии, сезон и фазу. Мы не повторяемся. Ты узнаешь наполнение, только открыв коробку."
+          buttonLabel="Выбрать ритм"
+          onPress={openBot}
+        />
+
+        <MysteryTierCard
+          title="Полная симфония"
+          price="1999₽/мес"
+          tint={colors.surface}
+          glow="#C9B5FF"
+          active={isActive && tier === 'vip'}
+          body="Расширенная тайна для тех, кто хочет больше заботы и сюрпризов. Органические средства гигиены, гастрономический подарок ручной работы, ритуалы ухода для лица, тела и души, чайная церемония и тайный презент. Плюс персональные гайды и медитации в приложении. Бесплатная доставка к началу цикла. Мы собираем этот бокс в абсолютной тишине, зная о тебе больше, чем ты думаешь. Открой – и почувствуй мелодию заботы, написанную только для тебя."
+          buttonLabel="Выбрать симфонию"
+          onPress={openBot}
+        />
 
         <View style={styles.codeCard}>
-          <Text style={styles.codeTitle}>{t('subscription.codeTitle')}</Text>
-          <Text style={styles.codeHint}>{t('subscription.codeHint')}</Text>
+          <Text style={styles.codeTitle}>Код активации</Text>
+          <Text style={styles.codeHint}>
+            Бот пришлёт его после оплаты. Введи код, чтобы активировать подписку в приложении.
+          </Text>
           <TextInput
             style={styles.codeInput}
-            placeholder={t('subscription.codePlaceholder')}
+            placeholder="Например, A7K9TXM2"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="characters"
             autoCorrect={false}
             value={code}
-            onChangeText={(v) => setCode(v.toUpperCase())}
+            onChangeText={(value) => setCode(value.toUpperCase())}
             editable={!submitting}
           />
           <Pressable
-            style={[
-              styles.cta,
-              { backgroundColor: colors.primary, marginTop: 12, opacity: submitting ? 0.6 : 1 },
-            ]}
+            style={[styles.activateButton, submitting && { opacity: 0.6 }]}
             onPress={onActivate}
             disabled={submitting}
           >
-            <Text style={styles.ctaText}>{t('subscription.activate')}</Text>
+            <Text style={styles.activateButtonText}>Активировать</Text>
           </Pressable>
         </View>
-
-        <View style={styles.howCard}>
-          <Text style={styles.howTitle}>{t('subscription.howTitle')}</Text>
-          {[
-            t('subscription.howStep1'),
-            t('subscription.howStep2'),
-            t('subscription.howStep3'),
-            t('subscription.howStep4'),
-          ].map((step, i) => (
-            <View key={i} style={styles.howRow}>
-              <View style={styles.howNum}>
-                <Text style={styles.howNumText}>{i + 1}</Text>
-              </View>
-              <Text style={styles.howText}>{step}</Text>
-            </View>
-          ))}
-        </View>
-
-        <Text style={styles.disclaimer}>{t('subscription.disclaimer')}</Text>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+const stylesShared = StyleSheet.create({
+  card: {
+    borderRadius: 24,
+    padding: 22,
+    marginBottom: 18,
+    shadowOpacity: 0.16,
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 18,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 14,
+  },
+  cardTitle: {
+    flex: 1,
+    fontSize: 28,
+    lineHeight: 32,
+    fontFamily: SERIF_STACK,
+    color: '#7E6177',
+  },
+  cardPrice: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#7E6177',
+  },
+  cardBody: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: '#8F786C',
+  },
+  cardButton: {
+    marginTop: 18,
+    alignSelf: 'flex-start',
+    backgroundColor: BUTTON_ACCENT,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  cardButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+});
+
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16, paddingBottom: 32 },
-    h1: {
-      fontSize: 30,
+    content: {
+      padding: 16,
+      paddingBottom: 32,
+    },
+    title: {
+      fontSize: 36,
+      lineHeight: 44,
       fontFamily: SERIF_STACK,
-      fontWeight: '300',
-      color: colors.primary,
+      color: colors.text,
       marginTop: 8,
     },
     subtitle: {
+      marginTop: 8,
+      marginBottom: 24,
+      fontSize: 17,
+      lineHeight: 24,
       color: colors.textMuted,
-      fontSize: 14,
-      marginTop: 6,
-      marginBottom: 20,
-      lineHeight: 20,
     },
     statusCard: {
       backgroundColor: colors.card,
-      borderRadius: 16,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
       padding: 18,
-      borderWidth: 1.5,
-      borderColor: colors.primary,
-      marginBottom: 20,
+      marginBottom: 18,
     },
-    statusLabel: {
-      color: colors.textMuted,
+    statusEyebrow: {
       fontSize: 12,
-      letterSpacing: 1.2,
       textTransform: 'uppercase',
+      letterSpacing: 1.1,
+      color: colors.textMuted,
     },
-    statusTier: {
-      color: colors.primary,
+    statusTitle: {
+      marginTop: 6,
+      fontSize: 24,
       fontFamily: SERIF_STACK,
-      fontSize: 26,
-      marginTop: 4,
-      fontWeight: '600',
+      color: colors.text,
     },
     statusRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       marginTop: 12,
-    },
-    statusKey: { color: colors.textMuted, fontSize: 13 },
-    statusVal: { color: colors.text, fontSize: 13, fontWeight: '600' },
-    statusHint: { color: colors.textMuted, fontSize: 12, marginTop: 6 },
-    card: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 18,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: 16,
-      shadowColor: '#000',
-      shadowOpacity: 0.05,
-      shadowOffset: { width: 0, height: 2 },
-      shadowRadius: 6,
-      elevation: 2,
-    },
-    cardHeader: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'space-between',
+      gap: 12,
     },
-    cardTitle: {
-      fontSize: 18,
+    statusKey: {
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    statusVal: {
+      fontSize: 14,
       fontWeight: '700',
-      letterSpacing: 0.5,
-      fontFamily: SERIF_STACK,
+      color: colors.text,
     },
-    badge: {
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 999,
+    statusHint: {
+      marginTop: 6,
+      fontSize: 13,
+      color: colors.textMuted,
     },
-    badgeText: { color: '#FFFCF7', fontSize: 11, fontWeight: '700' },
-    priceRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 12 },
-    price: { fontSize: 28, fontWeight: '700' },
-    period: { color: colors.textMuted, marginLeft: 4, fontSize: 14 },
-    benefits: { marginTop: 14, gap: 8 },
-    benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    benefitDot: { width: 6, height: 6, borderRadius: 3, marginTop: 7 },
-    benefitText: { color: colors.text, fontSize: 14, flex: 1, lineHeight: 19 },
-    cta: {
-      marginTop: 18,
-      paddingVertical: 14,
+    manageButton: {
+      marginTop: 14,
+      backgroundColor: BUTTON_ACCENT,
       borderRadius: 16,
+      paddingVertical: 14,
       alignItems: 'center',
     },
-    ctaText: {
-      color: '#FFFCF7',
+    manageButtonText: {
+      color: '#FFFFFF',
       fontSize: 15,
       fontWeight: '700',
-      letterSpacing: 0.3,
     },
     codeCard: {
-      marginTop: 4,
-      marginBottom: 16,
-      padding: 18,
+      marginTop: 6,
       backgroundColor: colors.card,
-      borderRadius: 16,
+      borderRadius: 20,
       borderWidth: 1,
       borderColor: colors.border,
+      padding: 18,
     },
     codeTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.primary,
+      fontSize: 22,
       fontFamily: SERIF_STACK,
+      color: colors.text,
     },
     codeHint: {
-      color: colors.textMuted,
-      fontSize: 13,
-      marginTop: 6,
+      marginTop: 8,
       marginBottom: 12,
-      lineHeight: 18,
+      fontSize: 14,
+      lineHeight: 21,
+      color: colors.textMuted,
     },
     codeInput: {
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
+      backgroundColor: colors.background,
+      borderRadius: 14,
       paddingHorizontal: 14,
       paddingVertical: 12,
       fontSize: 16,
       letterSpacing: 2,
       color: colors.text,
-      backgroundColor: colors.background,
     },
-    howCard: {
-      marginTop: 8,
-      padding: 18,
-      backgroundColor: colors.card,
+    activateButton: {
+      marginTop: 12,
+      backgroundColor: BUTTON_ACCENT,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    howTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: colors.text,
-      fontFamily: SERIF_STACK,
-      marginBottom: 8,
-    },
-    howRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
-      marginTop: 10,
-    },
-    howNum: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: colors.primary,
+      paddingVertical: 14,
       alignItems: 'center',
-      justifyContent: 'center',
     },
-    howNumText: {
-      color: '#FFFCF7',
-      fontSize: 12,
+    activateButtonText: {
+      color: '#FFFFFF',
+      fontSize: 15,
       fontWeight: '700',
-    },
-    howText: {
-      color: colors.text,
-      fontSize: 14,
-      flex: 1,
-      lineHeight: 20,
-    },
-    disclaimer: {
-      color: colors.textMuted,
-      fontSize: 11,
-      marginTop: 16,
-      textAlign: 'center',
-      lineHeight: 16,
     },
   });
