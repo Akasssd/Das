@@ -11,10 +11,7 @@ from aiogram.types import CallbackQuery, Message
 
 from bot.db import session_scope
 from bot.keyboards.common import multi_choice, single_choice, yes_no, confirm_keyboard
-from bot.services.admin_notify import (
-    notify_admin_full_profile,
-    notify_admin_step,
-)
+from bot.services.admin_notify import notify_admin_full_profile
 from bot.services.users import get_or_create_profile, get_or_create_user
 from bot.states import Onboarding
 
@@ -235,9 +232,6 @@ async def step_period_length(message: Message, state: FSMContext) -> None:
         await message.answer("Обычно 3–7 дней. Уточни.")
         return
     await _save_field(message, period_length_days=days)
-    await notify_admin_step(
-        message.bot, message.from_user, step_index=1, step_title="Базовый профиль"
-    )
     # Step 2 begins
     await _start_step2(message, state)
 
@@ -340,9 +334,6 @@ async def flow_heaviness_pick(cb: CallbackQuery, state: FSMContext) -> None:
         await cb.answer()
         return
     await _save_field(cb, flow_heaviness=cb.data)
-    await notify_admin_step(
-        cb.message.bot, cb.from_user, step_index=2, step_title="Гигиена"
-    )
     await _start_step3(cb, state)
 
 
@@ -395,12 +386,6 @@ async def allergy_notes(message: Message, state: FSMContext) -> None:
     if text.lower() in {"нет", "no", "-"}:
         text = ""
     await _save_field(message, allergy_notes=text)
-    await notify_admin_step(
-        message.bot,
-        message.from_user,
-        step_index=3,
-        step_title="Аллергии и кожа",
-    )
     # Step 4
     await state.set_state(Onboarding.diet)
     await message.answer(
@@ -492,9 +477,6 @@ async def dislikes_text(message: Message, state: FSMContext) -> None:
     if text.lower() in {"нет", "no", "-"}:
         text = ""
     await _save_field(message, dislikes=text)
-    await notify_admin_step(
-        message.bot, message.from_user, step_index=4, step_title="Образ жизни"
-    )
     # Step 5
     await state.set_state(Onboarding.favorite_season)
     await message.answer(
@@ -564,12 +546,6 @@ async def hobbies_text(message: Message, state: FSMContext) -> None:
     if text.lower() in {"нет", "no", "-"}:
         text = ""
     await _save_field(message, hobbies=text)
-    await notify_admin_step(
-        message.bot,
-        message.from_user,
-        step_index=5,
-        step_title="Глубинные предпочтения",
-    )
     # Step 6: address
     await state.set_state(Onboarding.address_country)
     await message.answer(
@@ -655,14 +631,8 @@ async def _save_address(message: Message, state: FSMContext, field: str) -> None
         prompt = next(q for f, q, _ in ADDRESS_CHAIN if f == next_field)
         await message.answer(prompt)
     else:
-        # Step 6 fully completed — notify admin with the full digest before
-        # the client picks a tariff.
-        await notify_admin_step(
-            message.bot,
-            message.from_user,
-            step_index=6,
-            step_title="Адрес доставки",
-        )
+        # Questionnaire fully completed — send the full digest to admin in
+        # one message right before the client picks a tariff.
         async with session_scope() as session:
             user = await get_or_create_user(session, message.from_user)
             profile = await get_or_create_profile(session, user)
