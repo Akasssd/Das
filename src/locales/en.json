@@ -271,8 +271,18 @@
     "howStep2": "Bot asks a few questions: tier, hygiene, allergies, diet, care.",
     "howStep3": "You provide a delivery address and pay right in the chat.",
     "howStep4": "Box arrives a couple of days before your cycle — tracking is in the bot too.",
+    "codeTitle": "Already have an activation code?",
+    "codeHint": "Bot sends it after payment. Paste the code below to flip your subscription on.",
+    "codePlaceholder": "e.g. A7K9TXM2",
+    "activate": "Activate",
+    "codeEmptyTitle": "Enter the code",
+    "codeEmptyBody": "Copy the code from the bot's message and paste it here.",
+    "codeInvalidTitle": "Code not found",
+    "codeInvalidBody": "Double-check that you've entered the full code with no spaces. If it's correct, message the bot.",
+    "activatedTitle": "Subscription activated",
+    "activatedBody": "Tier: {{tier}}. Valid through {{expires}}.",
     "botUnavailableTitle": "Couldn't open Telegram",
-    "disclaimer": "Subscriptions are managed only through the bot — the app does not store payment details."
+    "disclaimer": "Payments happen only through the bot. The app only accepts activation codes — no payment data stored."
   },
   "manage": {
     "title": "Manage subscription",

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,9 +58,11 @@ interface Tariff {
 
 export const SubscriptionScreen: React.FC = () => {
   const { colors, t, language } = useApp();
-  const { subscription, tier, isActive, daysLeft } = useSubscription();
+  const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [code, setCode] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const fmtDate = (iso: string | null): string => {
     if (!iso) return '—';
@@ -108,6 +111,32 @@ export const SubscriptionScreen: React.FC = () => {
     Linking.openURL(TELEGRAM_BOT_URL).catch(() => {
       Alert.alert(t('subscription.botUnavailableTitle'), TELEGRAM_BOT_URL);
     });
+  };
+
+  const onActivate = async () => {
+    setSubmitting(true);
+    try {
+      const res = await activate(code);
+      if (res.ok) {
+        setCode('');
+        Alert.alert(
+          t('subscription.activatedTitle'),
+          t('subscription.activatedBody', {
+            tier:
+              res.tier === 'vip'
+                ? t('subscription.vipLabel')
+                : t('subscription.basicLabel'),
+            expires: fmtDate(`${res.expires}T00:00:00.000Z`),
+          }),
+        );
+      } else if (res.reason === 'empty') {
+        Alert.alert(t('subscription.codeEmptyTitle'), t('subscription.codeEmptyBody'));
+      } else {
+        Alert.alert(t('subscription.codeInvalidTitle'), t('subscription.codeInvalidBody'));
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderTariffCard = (tariff: Tariff) => {
@@ -187,6 +216,31 @@ export const SubscriptionScreen: React.FC = () => {
         ) : null}
 
         {tariffs.map(renderTariffCard)}
+
+        <View style={styles.codeCard}>
+          <Text style={styles.codeTitle}>{t('subscription.codeTitle')}</Text>
+          <Text style={styles.codeHint}>{t('subscription.codeHint')}</Text>
+          <TextInput
+            style={styles.codeInput}
+            placeholder={t('subscription.codePlaceholder')}
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            value={code}
+            onChangeText={(v) => setCode(v.toUpperCase())}
+            editable={!submitting}
+          />
+          <Pressable
+            style={[
+              styles.cta,
+              { backgroundColor: colors.primary, marginTop: 12, opacity: submitting ? 0.6 : 1 },
+            ]}
+            onPress={onActivate}
+            disabled={submitting}
+          >
+            <Text style={styles.ctaText}>{t('subscription.activate')}</Text>
+          </Pressable>
+        </View>
 
         <View style={styles.howCard}>
           <Text style={styles.howTitle}>{t('subscription.howTitle')}</Text>
@@ -306,6 +360,39 @@ const makeStyles = (colors: ThemeColors) =>
       fontSize: 15,
       fontWeight: '700',
       letterSpacing: 0.3,
+    },
+    codeCard: {
+      marginTop: 4,
+      marginBottom: 16,
+      padding: 18,
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    codeTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.primary,
+      fontFamily: SERIF_STACK,
+    },
+    codeHint: {
+      color: colors.textMuted,
+      fontSize: 13,
+      marginTop: 6,
+      marginBottom: 12,
+      lineHeight: 18,
+    },
+    codeInput: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      letterSpacing: 2,
+      color: colors.text,
+      backgroundColor: colors.background,
     },
     howCard: {
       marginTop: 8,

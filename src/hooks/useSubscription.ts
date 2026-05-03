@@ -1,7 +1,8 @@
 import { differenceInCalendarDays, isBefore, parseISO } from 'date-fns';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useApp } from '../AppContext';
 import { DEFAULT_SUBSCRIPTION, Subscription, SubscriptionTier } from '../types';
+import { activateCode } from '../utils/activation';
 
 export interface UseSubscriptionApi {
   subscription: Subscription;
@@ -10,6 +11,14 @@ export interface UseSubscriptionApi {
   isBasic: boolean;
   isVip: boolean;
   daysLeft: number;
+  /**
+   * Send the user-entered activation code to the FlowCare API. On success
+   * persists tier + renewsAt locally and returns the resolved tier.
+   */
+  activate: (code: string) => Promise<
+    | { ok: true; tier: SubscriptionTier; expires: string }
+    | { ok: false; reason: 'empty' | 'invalid' | 'network' }
+  >;
 }
 
 const isActiveNow = (sub: Subscription, now = new Date()): boolean => {
@@ -32,13 +41,12 @@ const computeDaysLeft = (sub: Subscription, now = new Date()): number => {
 };
 
 /**
- * Subscription state read-side hook.
+ * Subscription state hook.
  *
- * Source of truth: the Telegram bot (./bot/). For now the app trusts whatever
- * state is in AsyncStorage; in a future iteration `bot/api/<endpoint>` will
- * push tier + renewsAt updates back to the app, replacing the placeholder
- * sync below. The hook auto-downgrades to free when `renewsAt` is past so
- * stale state from a long-running session can't grant unpaid access.
+ * Source of truth: the FlowCare backend (`./api/`) which is fed by
+ * the Telegram bot (`./bot/`). The user pastes the bot-issued
+ * activation code into the app; we POST it to /v1/activate and
+ * mirror the resulting tier + expires locally.
  */
 export const useSubscription = (): UseSubscriptionApi => {
   const { data, updateSubscription } = useApp();
@@ -50,9 +58,29 @@ export const useSubscription = (): UseSubscriptionApi => {
     }
   }, [sub, updateSubscription]);
 
-  // TODO(bot-sync): once the bot exposes a webhook / API, fetch tier &
-  // renewsAt for the current Telegram chat_id here and call
-  // `updateSubscription({ tier, renewsAt, ... })` to keep the app in sync.
+  const activate = useCallback<UseSubscriptionApi['activate']>(
+    async (code) => {
+      const trimmed = code.trim();
+      if (!trimmed) return { ok: false, reason: 'empty' };
+      const res = await activateCode(trimmed);
+      if (!res.valid || !res.tariff || !res.expires) {
+        return { ok: false, reason: 'invalid' };
+      }
+      const renewsAtIso = `${res.expires}T00:00:00.000Z`;
+      const nowIso = new Date().toISOString();
+      await updateSubscription({
+        tier: res.tariff,
+        productId: res.tariff === 'vip' ? 'vip_monthly' : 'basic_monthly',
+        startedAt: nowIso,
+        renewsAt: renewsAtIso,
+        cancelled: false,
+        lastSyncedAt: nowIso,
+        activationCode: trimmed,
+      });
+      return { ok: true, tier: res.tariff, expires: res.expires };
+    },
+    [updateSubscription],
+  );
 
   const active = isActiveNow(sub);
 
@@ -63,5 +91,6 @@ export const useSubscription = (): UseSubscriptionApi => {
     isBasic: active && sub.tier === 'basic',
     isVip: active && sub.tier === 'vip',
     daysLeft: computeDaysLeft(sub),
+    activate,
   };
 };

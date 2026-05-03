@@ -1,103 +1,193 @@
-# FlowCare Telegram bot
+# FlowCare Telegram Bot
 
-Subscription onboarding bot for the **Cycle Tracker** app. Runs the
-questionnaire, collects address, forwards every confirmed order to the admin
-chat and persists a JSONL log for QA.
+Backend service for the **Flow** menstrual-cycle tracker app: sells the
+monthly "care box" subscription, runs a deep questionnaire to learn the
+customer, generates an activation code for the mobile app, and helps an
+operator assemble personalised boxes every cycle.
 
-Built with [aiogram 3](https://docs.aiogram.dev/) on Python 3.11+.
+## Architecture
 
-## Quick start
-
-```bash
-cd bot/
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env
-# Edit .env and fill in BOT_TOKEN + ADMIN_CHAT_ID
-#   - BOT_TOKEN: send /newbot to https://t.me/BotFather, copy the token
-#   - ADMIN_CHAT_ID: forward any message to https://t.me/userinfobot, copy your "Id"
-
-python -m bot.main
+```
+bot/
+├── main.py             # aiogram entrypoint + APScheduler
+├── config.py           # pydantic-settings, env-driven
+├── db.py               # SQLAlchemy async engine + session
+├── states.py           # FSM states for the questionnaire
+├── handlers/           # aiogram routers
+│   ├── start.py        # /start, /help, /cancel, welcome screen
+│   ├── onboarding.py   # 7-step questionnaire FSM
+│   ├── payment.py      # tariff selection + Telegram Payments + code issuing
+│   └── cabinet.py      # /mybox, edit profile, pause
+├── keyboards/          # inline keyboard builders
+├── models/             # SQLAlchemy ORM (User, Profile, Subscription,
+│                       #   ActivationCode, CatalogItem, Order, DeliveryHistory)
+├── services/           # repositories + business logic
+│   ├── users.py
+│   ├── subscriptions.py
+│   ├── codes.py        # 8-char unique code generation + redeem
+│   ├── catalog.py      # ~30-item seeded catalog
+│   ├── recommender.py  # filter by allergies/season/history → box list
+│   └── payments.py     # Telegram Payments invoice + post-pay finalisation
+├── scheduler.py        # APScheduler daily job (T-5 days from cycle)
+└── migrations/         # Alembic
+api/
+├── main.py             # FastAPI: POST /v1/activate {code} → tariff/expires
+└── Dockerfile
 ```
 
-The bot uses long-polling, so no webhook server / public IP is required.
+The bot and the API share the same SQLAlchemy models and database — the
+bot writes activation codes, the API redeems them on behalf of the
+mobile app.
 
-## Flow
+## Setup
 
-1. User taps "Оформить через Telegram" inside the app or types `/start` to the
-   bot.
-2. Bot greets them and shows tariff buttons (Basic 999 ₽ / VIP 1999 ₽).
-3. After tariff choice, the bot walks the user through the 5-step
-   questionnaire defined in [`questions.py`](./questions.py):
+### 1. Create the bot
 
-   1. Hygiene products (multi-select)
-   2. Allergies / sensitivities (multi-select)
-   3. Diet style (single)
-   4. Care items to add (multi-select)
-   5. Free-form notes (optional)
+1. Open [@BotFather](https://t.me/BotFather), `/newbot`, choose name & username.
+2. Copy the `BOT_TOKEN`.
+3. (Optional, for real payments) `/mybots` → choose bot → **Payments**
+   → connect a YooMoney provider; copy the `PAYMENT_PROVIDER_TOKEN`.
 
-4. Bot collects address and recipient name as free-form text.
-5. Bot shows a summary card and asks for confirmation.
-6. On confirm, the bot:
-   - Appends the order to `orders.jsonl`
-   - Sends a formatted notification to `ADMIN_CHAT_ID`
-   - Shows the user a payment placeholder (to be replaced with Telegram
-     Payments / YooKassa later)
-7. `/cancel` aborts the current flow at any time.
+### 2. Find your admin chat ID
 
-## Editing the questionnaire
+Forward any message to [@userinfobot](https://t.me/userinfobot). It will
+reply with your numeric chat ID. Optionally create a separate chat for
+box-assembly tasks and use its ID as `ASSEMBLY_CHAT_ID`.
 
-`bot/questions.py` is the only file you need to edit to add/remove/reorder
-questions. Each `Step` has:
+### 3. Configure environment
 
-- `kind="single"` — radio-style; user must pick one option
-- `kind="multi"`  — checkbox-style; user toggles options, taps "✅ Готово"
-- `kind="text"`   — free-form text answer
-- `optional=True` — adds a "Пропустить" button (only meaningful for `text`)
+```bash
+cd bot
+cp .env.example .env
+# edit BOT_TOKEN, ADMIN_CHAT_ID, PAYMENT_PROVIDER_TOKEN
+```
 
-The runtime FSM and the keyboards regenerate automatically.
+### 4. Run with Docker Compose (recommended)
+
+From the repo root:
+
+```bash
+docker compose up -d --build
+docker compose logs -f bot
+```
+
+This launches:
+- `postgres` (Postgres 16, port 5432)
+- `bot` — the aiogram bot, polling Telegram
+- `api` — FastAPI on port 8000
+
+### 5. Run locally without Docker (SQLite)
+
+```bash
+cd bot
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cd ..
+python -m bot.main          # questionnaire bot
+# in another terminal:
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+## Activation flow
+
+1. Customer runs `/start`, taps **Начать настройку бокса**.
+2. Bot walks through 7 steps:
+   - Basic profile (name, age, city, cycle stats)
+   - Hygiene preferences (pads + tampons by brand, cup, period panties)
+   - Allergies & sensitive skin
+   - Lifestyle (diet, goal, joys, novelty, dislikes)
+   - Deep preferences (favourite season, calming, occupation, hobbies)
+   - Delivery address
+   - Tariff (Basic 999₽ / VIP 1999₽) + Telegram Payments
+3. After successful payment the bot generates a unique 8-char activation
+   code (e.g. `K7M3X2QY`) and DMs it to the customer.
+4. Customer pastes the code into the **Подписка** tab in the Flow app.
+   The app calls `POST /v1/activate {code}` against the FastAPI service.
+   The service redeems the code and returns `{valid, tariff, expires}`,
+   which the app stores locally and uses to flip the subscription banner.
+
+## Personal cabinet
+
+- `/mybox` — current tariff, valid-through date, predicted next ship
+  date, and the contents of the previous box (after shipping).
+- "✏️ Изменить профиль" — re-runs the questionnaire (overwrites answers).
+- "⏸ Поставить на паузу" — DMs the admin chat with a pause request.
+
+## Box assembly job
+
+`scheduler.py` runs daily at 09:00 UTC and checks every active
+subscription. For each user whose next ship date is *today*
+(`anchor_date + cycle_length − BOX_LEAD_DAYS`), it:
+
+1. Calls `services.recommender.build_box(user, profile, tariff)`.
+2. Filters the catalog by allergies, sensitivity, diet, current season.
+3. Avoids items shipped in the last 3 boxes (novelty bonus).
+4. Picks one item per slot (tariff-specific composition).
+5. DMs the assembly chat with the list, formatted for the operator.
+6. Records the planned shipment in `delivery_history` (status=`planned`).
+
+## Database
+
+PostgreSQL in Docker; SQLite (via `aiosqlite`) for local dev. Tables:
+
+- `users` (Telegram-side)
+- `profiles` (questionnaire answers + delivery address)
+- `subscriptions` (tariff, dates, status, payment_id)
+- `activation_codes` (unique code → subscription mapping)
+- `catalog_items` (SKU, name, brand, category, price, tags, allergens)
+- `orders` (one per payment, snapshot of the deal)
+- `delivery_history` (per shipment items)
+
+### Migrations
+
+```bash
+alembic revision --autogenerate -m "describe change"
+alembic upgrade head
+```
+
+`bot.main.init_db` calls `Base.metadata.create_all` on startup, which
+keeps SQLite dev mode hassle-free; in production rely on Alembic.
+
+## API contract
+
+```
+POST /v1/activate
+Content-Type: application/json
+
+{
+  "code": "K7M3X2QY",
+  "device_id": "optional-device-uuid"
+}
+
+→ 200 { "valid": true, "tariff": "vip", "expires": "2026-06-02",
+        "redeemed_at": "2026-05-03T08:42:46.413195" }
+→ 200 { "valid": false }   // unknown / expired / already-claimed-by-other-device
+
+GET /health → 200 {"status":"ok"}
+```
 
 ## Deployment
 
-The bot has zero external dependencies beyond Telegram and a writable
-filesystem for `orders.jsonl`. Any of these will work:
-
-- **Local laptop / Mac mini** — just `python -m bot.main` in a screen/tmux
-  session.
-- **VPS** — wrap in a `systemd` unit (example below).
-- **Railway / Fly.io / Render** — any PaaS that runs a Python long-poll
-  process.
-
-### systemd example (`/etc/systemd/system/flowcare-bot.service`)
-
-```ini
-[Unit]
-Description=FlowCare Telegram bot
-After=network-online.target
-
-[Service]
-WorkingDirectory=/opt/flowcare/bot
-ExecStart=/opt/flowcare/bot/.venv/bin/python -m bot.main
-EnvironmentFile=/opt/flowcare/bot/.env
-Restart=always
-RestartSec=5
-User=flowcare
-
-[Install]
-WantedBy=multi-user.target
-```
+A simple production setup on a VPS:
 
 ```bash
-sudo systemctl enable --now flowcare-bot
-sudo journalctl -u flowcare-bot -f
+# 1. Clone
+git clone https://github.com/sorordgsh-bot/NewRepo.git flowcare && cd flowcare
+
+# 2. Configure
+cp bot/.env.example bot/.env && nano bot/.env
+
+# 3. Run
+docker compose up -d --build
+
+# 4. Tail logs
+docker compose logs -f bot
+docker compose logs -f api
+
+# 5. Update later
+git pull && docker compose up -d --build
 ```
 
-## Future work
-
-- Replace `simulate_payment` with real Telegram Payments / YooKassa.
-- Expose a small HTTP API (e.g. `/v1/subscription/{user_id}`) so the mobile
-  app can sync the active tier and `renewsAt` directly. The hook stub in
-  [`src/hooks/useSubscription.ts`](../src/hooks/useSubscription.ts) (search
-  for `TODO(bot-sync)`) marks where the call goes.
-- Move from JSONL to Postgres / Firestore once the order volume grows.
+Reverse-proxy `api.your-domain.com` → `api:8000` with a TLS terminator
+(Caddy / nginx) and configure the Flow app's `extra.activationApiUrl`
+in `app.json` (or `app.config.ts`) accordingly.

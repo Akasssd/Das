@@ -1,6 +1,7 @@
 .env
-orders.jsonl
+*.db
+*.sqlite
 __pycache__/
 *.pyc
 .venv/
-venv/
+orders.jsonl

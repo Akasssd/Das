@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: flowcare
+      POSTGRES_USER: flowcare
+      POSTGRES_PASSWORD: flowcare
+    ports:
+      - "5432:5432"
+    volumes:
+      - flowcare-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flowcare"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      ADMIN_CHAT_ID: ${ADMIN_CHAT_ID:-}
+      ASSEMBLY_CHAT_ID: ${ASSEMBLY_CHAT_ID:-}
+      PAYMENT_PROVIDER_TOKEN: ${PAYMENT_PROVIDER_TOKEN:-}
+      DATABASE_URL: postgresql+asyncpg://flowcare:flowcare@postgres:5432/flowcare
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      DATABASE_URL: postgresql+asyncpg://flowcare:flowcare@postgres:5432/flowcare
+    ports:
+      - "8000:8000"
+
+volumes:
+  flowcare-pg:

@@ -39,3 +39,15 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Python venvs
+.venv/
+.venv-bot/
+__pycache__/
+*.pyc
+
+# FlowCare bot/api local files
+bot/.env
+flowcare.db
+flowcare-test.db
+*.sqlite
