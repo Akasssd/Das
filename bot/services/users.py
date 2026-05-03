@@ -3,13 +3,21 @@ from __future__ import annotations
 
 from aiogram.types import User as TGUser
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.models import Profile, User
 
 
 async def get_or_create_user(session: AsyncSession, tg_user: TGUser) -> User:
-    """Look up by telegram_id and create row if missing."""
+    """Look up by telegram_id and create row if missing.
+
+    Race-safe: when several /start updates arrive at once Telegram may dispatch
+    them concurrently; if two transactions both miss the SELECT they will both
+    try to INSERT and one will hit the UNIQUE(telegram_id) constraint. We
+    recover by rolling back the failed insert and re-fetching the row that the
+    other transaction wrote.
+    """
     stmt = select(User).where(User.telegram_id == tg_user.id)
     user = (await session.execute(stmt)).scalar_one_or_none()
     if user is None:
@@ -20,9 +28,12 @@ async def get_or_create_user(session: AsyncSession, tg_user: TGUser) -> User:
             language_code=tg_user.language_code,
         )
         session.add(user)
-        await session.flush()
-    else:
-        # Refresh display fields in case Telegram-side username changed.
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            user = (await session.execute(stmt)).scalar_one()
+    if user is not None:
         user.username = tg_user.username
         user.first_name = tg_user.first_name
         user.language_code = tg_user.language_code
@@ -35,5 +46,9 @@ async def get_or_create_profile(session: AsyncSession, user: User) -> Profile:
     if profile is None:
         profile = Profile(user_id=user.id)
         session.add(profile)
-        await session.flush()
+        try:
+            await session.flush()
+        except IntegrityError:
+            await session.rollback()
+            profile = (await session.execute(stmt)).scalar_one()
     return profile
