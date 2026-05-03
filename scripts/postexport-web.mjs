@@ -60,11 +60,69 @@ const headInsert = `
     <meta name="theme-color" content="#FFFCF7" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />`;
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <script>
+      // PWA self-heal: if the cached index.html references a JS bundle that no
+      // longer exists on the server (after a redeploy), the page renders blank.
+      // Detect an empty #root after the JS should have hydrated and reload with
+      // a cache-bust to fetch the fresh index.html and bundle.
+      (function(){
+        var attempted = false;
+        function bust(){
+          if (attempted) return; attempted = true;
+          try {
+            if ('caches' in window) {
+              caches.keys().then(function(keys){ keys.forEach(function(k){ caches.delete(k); }); });
+            }
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(rs){ rs.forEach(function(r){ r.unregister(); }); });
+            }
+          } catch(e){}
+          var u = new URL(window.location.href);
+          u.searchParams.set('_v', Date.now().toString());
+          window.location.replace(u.toString());
+        }
+        window.addEventListener('error', function(ev){
+          var t = ev && ev.target;
+          if (t && t.tagName === 'SCRIPT' && t.src && t.src.indexOf('/_expo/') !== -1) {
+            bust();
+          }
+        }, true);
+        setTimeout(function(){
+          var root = document.getElementById('root');
+          if (!root || root.children.length === 0) bust();
+        }, 4000);
+      })();
+    </script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function(){
+          navigator.serviceWorker.register('/sw.js').catch(function(){});
+        });
+      }
+    </script>`;
 
 if (!html.includes('apple-mobile-web-app-title')) {
   html = html.replace('<title>Lira</title>', `<title>Lira</title>${headInsert}`);
 }
 
 fs.writeFileSync(indexPath, html);
-console.log('Post-processed dist for iOS home-screen metadata.');
+
+const swSource = `// Lira PWA service worker — network-first for navigation requests so the
+// cached index.html never pins us to a stale JS bundle hash after redeploy.
+self.addEventListener('install', function(e){ self.skipWaiting(); });
+self.addEventListener('activate', function(e){ e.waitUntil(self.clients.claim()); });
+self.addEventListener('fetch', function(event){
+  var req = event.request;
+  if (req.method !== 'GET') return;
+  var url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
+  var isNav = req.mode === 'navigate' || (req.headers.get('accept') || '').indexOf('text/html') !== -1;
+  if (isNav || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(fetch(req, { cache: 'no-store' }).catch(function(){ return new Response('', { status: 504 }); }));
+  }
+});
+`;
+fs.writeFileSync(path.join(distDir, 'sw.js'), swSource);
+
+console.log('Post-processed dist for iOS home-screen metadata + PWA self-heal.');
