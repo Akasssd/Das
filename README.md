@@ -1,6 +1,6 @@
-# Cycle Tracker
+# Lira
 
-A privacy-first menstrual cycle tracking app built with **React Native + Expo**. Designed for iPhone but also runs on Android and the web because it ships as a single Expo project.
+Lira is a privacy-first menstrual cycle tracking app built with **React Native + Expo**. Designed for iPhone but also runs on Android and the web because it ships as a single Expo project.
 
 > Все данные хранятся **локально на устройстве** (AsyncStorage). Никаких аккаунтов, никаких облаков, никакой телеметрии.
 
@@ -22,7 +22,7 @@ A privacy-first menstrual cycle tracking app built with **React Native + Expo**.
 
 ## Subscription flow
 
-1. User opens the **Подписка** tab in the app and taps **«Оформить через Telegram»** on either tariff card — this opens `https://t.me/FlowCareBot?start=subscription`.
+1. User opens the **Подписка** tab in the app and taps **«Оформить через Telegram»** on either tariff card — this opens `https://t.me/lowerBsk24_bot?start=subscription`.
 2. The Telegram bot greets the user and walks them through the questionnaire (hygiene → allergies → diet → care → notes → address → name).
 3. The bot persists the order to `orders.jsonl` and forwards a formatted summary to the admin chat.
 4. Bot accepts payment (Telegram Payments / YooKassa — currently a placeholder) and will push the active tier + `renewsAt` to the app via a small HTTP API once that's wired up. See `TODO(bot-sync)` in [`src/hooks/useSubscription.ts`](src/hooks/useSubscription.ts).
