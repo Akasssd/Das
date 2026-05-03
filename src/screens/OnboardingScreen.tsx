@@ -97,8 +97,12 @@ export const OnboardingScreen: React.FC<Props> = ({
   const [prevPeriodEnd, setPrevPeriodEnd] = useState<string | null>(null);
   const [periodLen, setPeriodLen] = useState(data.settings.averagePeriodLength);
   const [cycleLen, setCycleLen] = useState(data.settings.averageCycleLength);
-  const [monthOffset, setMonthOffset] = useState(0);
-  const [prevMonthOffset, setPrevMonthOffset] = useState(-1);
+  const [monthOffset, setMonthOffset] = useState(() =>
+    new Date().getDate() <= 7 ? -1 : 0,
+  );
+  const [prevMonthOffset, setPrevMonthOffset] = useState(() =>
+    new Date().getDate() <= 7 ? -2 : -1,
+  );
   const [pinError, setPinError] = useState<string | null>(null);
 
   // Auto-derive cycle length from prev->last period start gap
@@ -343,6 +347,13 @@ export const OnboardingScreen: React.FC<Props> = ({
               colors={colors}
               monthOffset={monthOffset}
               onChangeMonthOffset={setMonthOffset}
+              onPickToday={() => {
+                const iso = format(new Date(), 'yyyy-MM-dd');
+                setLastPeriodStart(iso);
+                setLastPeriodEnd(null);
+                setPeriodLen(1);
+                setMonthOffset(0);
+              }}
               rangeStart={lastPeriodStart}
               rangeEnd={lastPeriodEnd}
               onRangePick={(iso) => {
