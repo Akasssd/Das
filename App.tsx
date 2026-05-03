@@ -178,6 +178,23 @@ const Tabs: React.FC = () => {
 const RootNavigator: React.FC = () => {
   const { colors, ready, data } = useApp();
   const [unlocked, setUnlocked] = React.useState(false);
+  const lastActiveAt = React.useRef<number>(Date.now());
+  const RELOCK_AFTER_MS = 30_000;
+
+  React.useEffect(() => {
+    if (!data.profile.pinHash) return;
+    const { AppState } = require('react-native') as typeof import('react-native');
+    const sub = AppState.addEventListener('change', (next: string) => {
+      if (next === 'active') {
+        if (Date.now() - lastActiveAt.current > RELOCK_AFTER_MS) {
+          setUnlocked(false);
+        }
+      } else {
+        lastActiveAt.current = Date.now();
+      }
+    });
+    return () => sub.remove();
+  }, [data.profile.pinHash]);
 
   if (!ready) {
     return (
