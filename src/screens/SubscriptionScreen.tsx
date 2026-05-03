@@ -24,10 +24,10 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 /**
  * Subscription onboarding lives entirely in the Telegram bot
- * (@FlowCareBot — see ./bot/ in the repo root). The flow:
+ * (@lowerBsk24_bot — see ./bot/ in the repo root). The flow:
  *
  *   1. User taps "Оформить через Telegram" — opens
- *      `https://t.me/FlowCareBot?start=subscription`.
+ *      `https://t.me/lowerBsk24_bot?start=subscription`.
  *   2. Bot greets the user and asks them to pick a tariff (Basic / VIP).
  *   3. Bot walks through a 5-step questionnaire:
  *        a) Hygiene products preference
@@ -43,7 +43,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
  * of truth. The app will sync subscription state from the bot's API later
  * (see useSubscription hook for the placeholder).
  */
-const TELEGRAM_BOT_URL = 'https://t.me/FlowCareBot?start=subscription';
+const TELEGRAM_BOT_URL = 'https://t.me/lowerBsk24_bot?start=subscription';
 
 interface Tariff {
   id: 'basic' | 'vip';

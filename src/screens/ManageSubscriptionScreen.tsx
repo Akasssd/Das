@@ -17,7 +17,7 @@ import { useSubscription } from '../hooks/useSubscription';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { ThemeColors } from '../theme';
 
-const TELEGRAM_BOT_URL = 'https://t.me/FlowCareBot?start=manage';
+const TELEGRAM_BOT_URL = 'https://t.me/lowerBsk24_bot?start=manage';
 
 export const ManageSubscriptionScreen: React.FC = () => {
   const { colors, t, language } = useApp();

@@ -1,0 +1,4 @@
+nohup: ignoring input
+INFO:flowcare-bot:FlowCare bot starting…
+INFO:aiogram.dispatcher:Start polling
+INFO:aiogram.dispatcher:Run polling for bot @lowerBsk24_bot id=8510060214 - 'Flower'
