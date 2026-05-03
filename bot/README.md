@@ -101,7 +101,7 @@ uvicorn api.main:app --host 0.0.0.0 --port 8000
    - Tariff (Basic 999₽ / VIP 1999₽) + Telegram Payments
 3. After successful payment the bot generates a unique 8-char activation
    code (e.g. `K7M3X2QY`) and DMs it to the customer.
-4. Customer pastes the code into the **Подписка** tab in the Flow app.
+4. Customer pastes the code into the **Подписка** tab in the Lira app.
    The app calls `POST /v1/activate {code}` against the FastAPI service.
    The service redeems the code and returns `{valid, tariff, expires}`,
    which the app stores locally and uses to flip the subscription banner.
@@ -189,5 +189,5 @@ git pull && docker compose up -d --build
 ```
 
 Reverse-proxy `api.your-domain.com` → `api:8000` with a TLS terminator
-(Caddy / nginx) and configure the Flow app's `extra.activationApiUrl`
+(Caddy / nginx) and configure the Lira app's `extra.activationApiUrl`
 in `app.json` (or `app.config.ts`) accordingly.

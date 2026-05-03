@@ -2,7 +2,7 @@
  * Activation API client.
  *
  * The Telegram bot at ./bot/ issues activation codes after a paid
- * subscription. The Flow app POSTs the user-entered code here and gets
+ * subscription. The Lira app POSTs the user-entered code here and gets
  * back the canonical tariff + expiry, which it then writes into the
  * local subscription state.
  */

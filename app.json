@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Cycle Tracker",
+    "name": "Lira",
     "slug": "cycle-tracker",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFF7F8"
+      "backgroundColor": "#FFFCF7"
     },
     "ios": {
       "supportsTablet": true,
@@ -24,7 +24,7 @@
       "package": "com.cycletracker.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFF7F8"
+        "backgroundColor": "#FFFCF7"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
