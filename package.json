@@ -9,7 +9,7 @@
     "web": "expo start --web",
     "export:web": "expo export --platform web && node scripts/postexport-web.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test test/cycle.test.ts test/pin.test.ts"
+    "test": "tsx --test test/cycle.test.ts test/pin.test.ts test/cycleCode.test.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -20,6 +20,7 @@
     "@react-navigation/native-stack": "^7.14.12",
     "date-fns": "^4.1.0",
     "expo": "~54.0.33",
+    "expo-clipboard": "~8.0.8",
     "expo-dev-client": "~6.0.20",
     "expo-localization": "~17.0.8",
     "expo-notifications": "~0.32.17",

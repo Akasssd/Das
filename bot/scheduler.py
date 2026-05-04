@@ -55,17 +55,20 @@ async def daily_box_assembly(bot: Bot) -> int:
             ).scalar_one_or_none()
             if profile is None or not profile.cycle_length_days:
                 continue
-            # crude T-5 days check from start_date + cycle_length
+            # T-5 days before the next predicted period start.
+            # Anchor priority:
+            #   1) profile.last_period_start (set via /sync code from the app)
+            #   2) subscription started_at (legacy fallback)
             cycle = profile.cycle_length_days
-            anchor = sub.started_at
-            next_period = anchor + timedelta(days=cycle)
-            ship_at = next_period - timedelta(days=settings.box_lead_days)
-            # Re-compute monthly cadence
-            while ship_at.date() < today:
-                anchor = anchor + timedelta(days=cycle)
-                next_period = anchor + timedelta(days=cycle)
-                ship_at = next_period - timedelta(days=settings.box_lead_days)
-            if ship_at.date() != today:
+            if profile.last_period_start is not None:
+                anchor_date = profile.last_period_start
+            else:
+                anchor_date = sub.started_at.date()
+            next_period_date = anchor_date + timedelta(days=cycle)
+            while next_period_date - timedelta(days=settings.box_lead_days) < today:
+                next_period_date = next_period_date + timedelta(days=cycle)
+            ship_date = next_period_date - timedelta(days=settings.box_lead_days)
+            if ship_date != today:
                 continue
 
             items = await build_box(

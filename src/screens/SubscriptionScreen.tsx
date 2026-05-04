@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -16,6 +17,8 @@ import { format, parseISO } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
 import { useApp } from '../AppContext';
+import { findPeriodStarts } from '../cycle';
+import { encodeCycleCode } from '../cycleCode';
 import { useSubscription } from '../hooks/useSubscription';
 import { RootStackParamList } from '../navigation';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
@@ -72,12 +75,40 @@ const MysteryTierCard: React.FC<MysteryTierCardProps> = ({
 };
 
 export const SubscriptionScreen: React.FC = () => {
-  const { colors } = useApp();
+  const { colors, data } = useApp();
   const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const syncCode = useMemo(() => {
+    const starts = findPeriodStarts(data.logs);
+    const startDate = starts.length > 0 ? starts[starts.length - 1] : null;
+    if (!startDate) return null;
+    try {
+      return encodeCycleCode({
+        startDate,
+        cycleLength: data.settings.averageCycleLength,
+        periodLength: data.settings.averagePeriodLength,
+      });
+    } catch {
+      return null;
+    }
+  }, [data.logs, data.settings.averageCycleLength, data.settings.averagePeriodLength]);
+
+  const copySyncCode = async () => {
+    if (!syncCode) return;
+    try {
+      await Clipboard.setStringAsync(syncCode);
+      Alert.alert(
+        'Скопировано',
+        `Открой Lira BOX и пришли ему сообщение:\n/sync ${syncCode}`,
+      );
+    } catch {
+      Alert.alert('Не удалось скопировать', syncCode);
+    }
+  };
 
   const fmtDate = (iso: string | null): string => {
     if (!iso) return '—';
@@ -167,6 +198,48 @@ export const SubscriptionScreen: React.FC = () => {
           buttonLabel="Выбрать симфонию"
           onPress={openBot}
         />
+
+        <View style={styles.codeCard}>
+          <Text style={styles.codeTitle}>Код синхронизации цикла</Text>
+          <Text style={styles.codeHint}>
+            Этот код описывает дату последних месячных, длину цикла и длину
+            месячных. Пришли его в Lira BOX, чтобы он точно знал, когда собирать
+            и присылать твою коробку.
+          </Text>
+          {syncCode ? (
+            <>
+              <View style={styles.syncBadge}>
+                <Text style={styles.syncBadgeText}>{syncCode}</Text>
+              </View>
+              <Pressable style={styles.activateButton} onPress={copySyncCode}>
+                <Text style={styles.activateButtonText}>
+                  Скопировать код
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.activateButton,
+                  { marginTop: 10, backgroundColor: 'transparent', borderWidth: 1, borderColor: BUTTON_ACCENT },
+                ]}
+                onPress={() => {
+                  const url = `https://t.me/lowerBsk24_bot?start=sync_${encodeURIComponent(syncCode)}`;
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Не получилось открыть Telegram', url);
+                  });
+                }}
+              >
+                <Text style={[styles.activateButtonText, { color: BUTTON_ACCENT }]}>
+                  Открыть Lira BOX
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.codeHint}>
+              Сначала отметь день начала последних месячных в календаре или на
+              экране «Сегодня». Тогда здесь появится твой код.
+            </Text>
+          )}
+        </View>
 
         <View style={styles.codeCard}>
           <Text style={styles.codeTitle}>Код активации</Text>
@@ -359,5 +432,22 @@ const makeStyles = (colors: ThemeColors) =>
       color: '#FFFFFF',
       fontSize: 15,
       fontWeight: '700',
+    },
+    syncBadge: {
+      marginTop: 4,
+      marginBottom: 12,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.background,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+    },
+    syncBadgeText: {
+      color: colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      letterSpacing: 4,
     },
   });

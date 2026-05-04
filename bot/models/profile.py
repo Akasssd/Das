@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import ForeignKey, Integer, JSON, String, Text
+from datetime import date
+
+from sqlalchemy import Date, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from bot.models.base import Base
@@ -26,6 +28,10 @@ class Profile(Base):
     cycle_length_days: Mapped[int | None] = mapped_column(Integer)
     period_length_days: Mapped[int | None] = mapped_column(Integer)
     flow_app_code: Mapped[str | None] = mapped_column(String(32))
+
+    # Cycle sync (set via /sync code from the app)
+    last_period_start: Mapped[date | None] = mapped_column(Date)
+    cycle_sync_code: Mapped[str | None] = mapped_column(String(16))
 
     # Step 2: hygiene preferences (multi-select catalog item IDs and choices)
     hygiene_pads: Mapped[list[str]] = mapped_column(JSON, default=list)

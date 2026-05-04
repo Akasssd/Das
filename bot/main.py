@@ -21,11 +21,27 @@ logging.basicConfig(
 log = logging.getLogger("flowcare-bot")
 
 
+async def _ensure_column(conn, table: str, column: str, type_sql: str) -> None:
+    """Add `column` to `table` if it does not yet exist (SQLite-friendly)."""
+    rows = await conn.exec_driver_sql(f"PRAGMA table_info({table})")
+    existing = {r[1] for r in rows.fetchall()}
+    if column not in existing:
+        await conn.exec_driver_sql(
+            f"ALTER TABLE {table} ADD COLUMN {column} {type_sql}"
+        )
+        log.info("Added column %s.%s", table, column)
+
+
 async def init_db() -> None:
     """Create tables (for SQLite dev mode) and seed the catalog. In Docker
     Compose Alembic owns migrations; this is a safe no-op if tables exist."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Idempotent ALTER TABLEs for SQLite dev DBs that pre-date a column
+        # (we own migrations via Alembic in Compose; this only matters for the
+        # ephemeral sqlite DB on the dev VM).
+        await _ensure_column(conn, "profiles", "last_period_start", "DATE")
+        await _ensure_column(conn, "profiles", "cycle_sync_code", "VARCHAR(16)")
     async with session_scope() as session:
         added = await seed_catalog(session)
         if added:
