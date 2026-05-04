@@ -3,15 +3,17 @@ import {
   Animated,
   Easing,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import Svg, { ClipPath, Defs, Path, Rect } from 'react-native-svg';
-import { format } from 'date-fns';
+import { addDays, format, parseISO } from 'date-fns';
 
 import { useApp } from '../AppContext';
 import { ThemeColors } from '../theme';
+import { useCycleCorrection, formatChipLabel } from '../hooks/useCycleCorrection';
 
 interface Props {
   /** True when within ±3 days of the predicted period — pulse + brighten. */
@@ -73,12 +75,14 @@ const Drop: React.FC<DropProps> = ({ size, fill, outline, fillRatio }) => {
  */
 export const PeriodStartedButton: React.FC<Props> = ({ highlight, colors }) => {
   const { data, upsertLogs } = useApp();
+  const { markPeriodStart } = useCycleCorrection();
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayLog = data.logs[todayKey];
   const isLoggedToday = !!(todayLog?.flow && todayLog.flow !== 'none');
 
   // Local taps progress: 0..3. Resets when log changes externally.
   const [taps, setTaps] = useState<number>(isLoggedToday ? 3 : 0);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     setTaps(isLoggedToday ? 3 : 0);
@@ -174,9 +178,77 @@ export const PeriodStartedButton: React.FC<Props> = ({ highlight, colors }) => {
         </Pressable>
       </Animated.View>
       <Text style={[styles.hint, { color: colors.textMuted }]}>{subtitle}</Text>
+
+      <Pressable onPress={() => setPickerOpen((o) => !o)} hitSlop={8}>
+        <Text style={[styles.adjustLink, { color: colors.primary }]}>
+          {pickerOpen ? 'Свернуть' : 'Месячные начались в другой день?'}
+        </Text>
+      </Pressable>
+
+      {pickerOpen ? (
+        <View style={styles.pickerWrap}>
+          <Text style={[styles.pickerHint, { color: colors.textMuted }]}>
+            Выбери день, когда фактически начались месячные. Все прогнозы — текущий цикл и будущие — пересчитаются.
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipsRow}
+          >
+            {Array.from({ length: 15 }, (_, i) => i - 7).map((offset) => {
+              const date = addDays(new Date(), offset);
+              const iso = format(date, 'yyyy-MM-dd');
+              const isToday = offset === 0;
+              const isFuture = offset > 0;
+              const log = data.logs[iso];
+              const isMarked =
+                log?.flow !== undefined && log.flow !== 'none';
+              const isSelected = isMarked;
+              return (
+                <Pressable
+                  key={iso}
+                  onPress={async () => {
+                    await markPeriodStart(iso);
+                    setPickerOpen(false);
+                  }}
+                  style={[
+                    styles.chip,
+                    {
+                      backgroundColor: isSelected
+                        ? colors.primary
+                        : colors.card,
+                      borderColor: isToday
+                        ? colors.primary
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      {
+                        color: isSelected
+                          ? colors.primaryText
+                          : isFuture
+                            ? colors.textMuted
+                            : colors.text,
+                        fontWeight: isToday ? '700' : '500',
+                      },
+                    ]}
+                  >
+                    {isToday ? 'Сегодня' : formatChipLabel(iso)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
     </View>
   );
 };
+
+void parseISO;
 
 const styles = StyleSheet.create({
   wrap: {
@@ -205,5 +277,40 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
     textAlign: 'center',
     paddingHorizontal: 24,
+  },
+  adjustLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 10,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
+  },
+  pickerWrap: {
+    width: '100%',
+    marginTop: 12,
+  },
+  pickerHint: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    lineHeight: 16,
+  },
+  chipsRow: {
+    paddingHorizontal: 12,
+    gap: 8,
+    flexDirection: 'row',
+  },
+  chip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 72,
+    alignItems: 'center',
+  },
+  chipText: {
+    fontSize: 13,
+    letterSpacing: 0.2,
   },
 });
