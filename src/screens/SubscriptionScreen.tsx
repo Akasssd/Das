@@ -241,22 +241,10 @@ export const SubscriptionScreen: React.FC = () => {
       navigation.navigate('ManageSubscription');
       return;
     }
-    Alert.alert(
-      'Lira Premium',
-      'Оплата в приложении скоро заработает. Пока напиши нам в Lira BOX — пришлём код активации Premium.',
-      [
-        { text: 'Закрыть', style: 'cancel' },
-        {
-          text: 'Открыть Lira BOX',
-          onPress: () =>
-            Linking.openURL('https://t.me/lowerBsk24_bot?start=premium').catch(
-              () => {
-                Alert.alert('Не получилось открыть Telegram');
-              },
-            ),
-        },
-      ],
-    );
+    const url = 'https://t.me/lowerBsk24_bot?start=premium';
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Не получилось открыть Telegram', url);
+    });
   };
 
   const onActivate = async () => {
