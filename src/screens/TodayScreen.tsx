@@ -25,6 +25,9 @@ import {
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
 import { WaveBackground } from '../components/WaveBackground';
+import { PeriodArrivedButton } from '../components/PeriodArrivedButton';
+import { PeriodArrivedModal } from '../components/PeriodArrivedModal';
+import { useCycleCorrection } from '../hooks/useCycleCorrection';
 
 const ruDayWord = (n: number): string => {
   const a = Math.abs(n) % 100;
@@ -154,6 +157,8 @@ export const TodayScreen: React.FC = () => {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const navigation = useNavigation<Nav>();
   const { isVip } = useSubscription();
+  const correction = useCycleCorrection();
+  const [arrivedOpen, setArrivedOpen] = useState(false);
   const vipShipDate = useMemo(() => {
     if (!isVip || !predictions.nextPeriodStart) return null;
     try {
@@ -303,6 +308,12 @@ export const TodayScreen: React.FC = () => {
       isVip={isVip}
       vipShipDate={vipShipDate}
       onTapBox={() => navigation.navigate('Subscription' as never)}
+      onOpenArrived={() => setArrivedOpen(true)}
+      arrivedHighlight={correction.isAroundPredicted}
+      arrivedOpen={arrivedOpen}
+      onCloseArrived={() => setArrivedOpen(false)}
+      onConfirmArrived={correction.markPeriodStart}
+      predictedDate={correction.predictedDate}
     />
   );
 };
@@ -330,6 +341,12 @@ interface TodayInnerProps {
   isVip: boolean;
   vipShipDate: Date | null;
   onTapBox: () => void;
+  onOpenArrived: () => void;
+  arrivedHighlight: boolean;
+  arrivedOpen: boolean;
+  onCloseArrived: () => void;
+  onConfirmArrived: (iso: string) => Promise<void>;
+  predictedDate: string | null;
 }
 
 const TodayInner: React.FC<TodayInnerProps> = ({
@@ -355,6 +372,12 @@ const TodayInner: React.FC<TodayInnerProps> = ({
   isVip,
   vipShipDate,
   onTapBox,
+  onOpenArrived,
+  arrivedHighlight,
+  arrivedOpen,
+  onCloseArrived,
+  onConfirmArrived,
+  predictedDate,
 }) => {
   const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
@@ -431,7 +454,13 @@ const TodayInner: React.FC<TodayInnerProps> = ({
           <View style={styles.ctaWrap}>
             <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
           </View>
-        ) : null}
+        ) : (
+          <PeriodArrivedButton
+            highlight={arrivedHighlight}
+            onPress={onOpenArrived}
+            colors={colors}
+          />
+        )}
 
         {isVip && vipShipDate ? (
           <Pressable style={styles.vipCard} onPress={onTapBox}>
@@ -493,6 +522,13 @@ const TodayInner: React.FC<TodayInnerProps> = ({
 
         <View style={{ height: 24 }} />
       </ScrollView>
+      <PeriodArrivedModal
+        visible={arrivedOpen}
+        predictedDate={predictedDate}
+        colors={colors}
+        onClose={onCloseArrived}
+        onConfirm={onConfirmArrived}
+      />
     </SafeAreaView>
   );
 };

@@ -35,6 +35,10 @@ export interface CycleStats {
   longestCycle: number | null;
   periodStarts: string[];
   averagePeriodLength: number | null;
+  /** True if the spread between the last 3 cycle lengths is > 7 days. */
+  irregular: boolean;
+  /** How many recent finished cycles were used to compute the average. */
+  recentCyclesUsed: number;
 }
 
 export const computeCycleStats = (
@@ -51,10 +55,22 @@ export const computeCycleStats = (
     if (len >= 15 && len <= 60) cycleLengths.push(len);
   }
 
+  // Use only the **last 3–6 finished cycles** for the rolling average so the
+  // prediction stays responsive to recent shifts. Fewer than 3 finished
+  // cycles → fall back to the manual setting in `computePredictions`.
+  const recent = cycleLengths.slice(-6);
   const avg =
-    cycleLengths.length > 0
-      ? Math.round(cycleLengths.reduce((a, b) => a + b, 0) / cycleLengths.length)
+    recent.length >= 3
+      ? Math.round(recent.reduce((a, b) => a + b, 0) / recent.length)
       : null;
+
+  // Irregular flag: spread between the last 3 cycles > 7 days.
+  let irregular = false;
+  if (recent.length >= 3) {
+    const last3 = recent.slice(-3);
+    const spread = Math.max(...last3) - Math.min(...last3);
+    irregular = spread > 7;
+  }
 
   // Compute average period length by counting consecutive bleeding days
   // starting from each detected period start.
@@ -81,6 +97,8 @@ export const computeCycleStats = (
     longestCycle: cycleLengths.length ? Math.max(...cycleLengths) : null,
     periodStarts,
     averagePeriodLength: avgPeriod,
+    irregular,
+    recentCyclesUsed: recent.length,
   };
 };
 
@@ -95,6 +113,10 @@ export interface CyclePredictions {
   daysUntilNextPeriod: number | null;
   effectiveCycleLength: number;
   effectivePeriodLength: number;
+  /** True when the last 3 finished cycles spread > 7 days. */
+  irregular: boolean;
+  /** Did the average come from logs (>=3 cycles) or from settings fallback? */
+  averageSource: 'logs' | 'settings';
 }
 
 export const computePredictions = (
@@ -105,6 +127,8 @@ export const computePredictions = (
   const stats = computeCycleStats(logs, settings);
   const cycleLen = stats.averageCycleLength ?? settings.averageCycleLength;
   const periodLen = stats.averagePeriodLength ?? settings.averagePeriodLength;
+  const averageSource: 'logs' | 'settings' =
+    stats.averageCycleLength !== null ? 'logs' : 'settings';
 
   const lastStart = stats.periodStarts.length
     ? stats.periodStarts[stats.periodStarts.length - 1]
@@ -122,6 +146,8 @@ export const computePredictions = (
       daysUntilNextPeriod: null,
       effectiveCycleLength: cycleLen,
       effectivePeriodLength: periodLen,
+      irregular: stats.irregular,
+      averageSource,
     };
   }
 
@@ -151,6 +177,8 @@ export const computePredictions = (
     daysUntilNextPeriod: daysUntil,
     effectiveCycleLength: cycleLen,
     effectivePeriodLength: periodLen,
+    irregular: stats.irregular,
+    averageSource,
   };
 };
 

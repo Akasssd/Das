@@ -37,17 +37,44 @@ test('findPeriodStarts detects each cycle start', () => {
 });
 
 test('computeCycleStats averages cycle and period lengths', () => {
+  // We now require ≥3 finished cycles (so 4 period starts) before averaging.
   const logs: Record<string, DayLog> = {
     ...makePeriod(new Date('2024-01-01'), 5),
     ...makePeriod(new Date('2024-01-29'), 5),
     ...makePeriod(new Date('2024-02-26'), 5),
+    ...makePeriod(new Date('2024-03-25'), 5),
   };
   const stats = computeCycleStats(logs, DEFAULT_SETTINGS);
-  assert.equal(stats.cycleLengths.length, 2);
+  assert.equal(stats.cycleLengths.length, 3);
   assert.equal(stats.averageCycleLength, 28);
   assert.equal(stats.averagePeriodLength, 5);
   assert.equal(stats.shortestCycle, 28);
   assert.equal(stats.longestCycle, 28);
+  assert.equal(stats.irregular, false);
+  assert.equal(stats.recentCyclesUsed, 3);
+});
+
+test('computeCycleStats falls back to settings until 3 cycles are seen', () => {
+  const logs: Record<string, DayLog> = {
+    ...makePeriod(new Date('2024-01-01'), 5),
+    ...makePeriod(new Date('2024-01-29'), 5),
+  };
+  const stats = computeCycleStats(logs, DEFAULT_SETTINGS);
+  assert.equal(stats.cycleLengths.length, 1);
+  assert.equal(stats.averageCycleLength, null);
+  assert.equal(stats.recentCyclesUsed, 1);
+});
+
+test('computeCycleStats marks irregular when last 3 cycles spread > 7 days', () => {
+  const logs: Record<string, DayLog> = {
+    ...makePeriod(new Date('2024-01-01'), 5),
+    ...makePeriod(new Date('2024-01-22'), 5), // 21 days
+    ...makePeriod(new Date('2024-02-21'), 5), // 30 days
+    ...makePeriod(new Date('2024-03-25'), 5), // 33 days
+  };
+  const stats = computeCycleStats(logs, DEFAULT_SETTINGS);
+  assert.equal(stats.cycleLengths.length, 3);
+  assert.equal(stats.irregular, true);
 });
 
 test('computeCycleStats ignores nonsensical gaps', () => {
