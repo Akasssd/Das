@@ -12,6 +12,7 @@ from aiogram.types import CallbackQuery, Message
 from bot.db import session_scope
 from bot.keyboards.common import multi_choice, single_choice, yes_no, confirm_keyboard
 from bot.services.admin_notify import notify_admin_full_profile
+from bot.services.cycle_code import decode_cycle_code
 from bot.services.users import get_or_create_profile, get_or_create_user
 from bot.states import Onboarding
 
@@ -173,7 +174,7 @@ async def step_city(message: Message, state: FSMContext) -> None:
     await _save_field(message, city=city)
     await state.set_state(Onboarding.flow_code_choice)
     await message.answer(
-        _q("У тебя уже есть код из приложения Flow для синхронизации цикла?"),
+        _q("У тебя уже есть код синхронизации цикла из приложения Lira?"),
         parse_mode="HTML",
         reply_markup=yes_no(skip=True),
     )
@@ -183,7 +184,10 @@ async def step_city(message: Message, state: FSMContext) -> None:
 async def step_flow_choice(cb: CallbackQuery, state: FSMContext) -> None:
     if cb.data == "yes":
         await state.set_state(Onboarding.flow_code_input)
-        await cb.message.answer("Пришли код из приложения:")
+        await cb.message.answer(
+            "Пришли код из приложения (8 символов, например <code>4FGA-9XPP</code>).",
+            parse_mode="HTML",
+        )
     else:
         await state.set_state(Onboarding.cycle_length)
         await cb.message.answer(
@@ -195,8 +199,30 @@ async def step_flow_choice(cb: CallbackQuery, state: FSMContext) -> None:
 
 @router.message(Onboarding.flow_code_input)
 async def step_flow_code(message: Message, state: FSMContext) -> None:
-    code = (message.text or "").strip().upper()
-    await _save_field(message, flow_app_code=code)
+    raw = (message.text or "").strip()
+    payload = decode_cycle_code(raw)
+    if payload is not None:
+        # Valid sync code → skip cycle/period questions and jump to step 2.
+        await _save_field(
+            message,
+            flow_app_code=raw.upper(),
+            cycle_sync_code=raw.upper(),
+            last_period_start=payload.start_date,
+            cycle_length_days=payload.cycle_length,
+            period_length_days=payload.period_length,
+        )
+        await message.answer(
+            "Отлично, цикл синхронизирован 💫\n"
+            f"• Последние месячные: <b>{payload.start_date:%d.%m.%Y}</b>\n"
+            f"• Длина цикла: <b>{payload.cycle_length} дн.</b>\n"
+            f"• Длина месячных: <b>{payload.period_length} дн.</b>",
+            parse_mode="HTML",
+        )
+        await _start_step2(message, state)
+        return
+    # Не код синхронизации — старое поведение (просто сохраним как app code и
+    # уточним длины вручную).
+    await _save_field(message, flow_app_code=raw.upper())
     await state.set_state(Onboarding.cycle_length)
     await message.answer(
         _q("Спасибо! Ещё уточни — какая средняя длина цикла? (число дней, например 28)"),

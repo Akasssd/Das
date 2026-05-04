@@ -132,8 +132,17 @@ def format_full_profile(user_tg: "TGUser", profile: "Profile") -> str:
         + (str(profile.birth_year) if profile.birth_year else "—")
     )
     lines.append(f"• Город: {_h(profile.city)}")
-    if profile.flow_app_code:
-        lines.append(f"• Код Flow: <code>{escape(profile.flow_app_code)}</code>")
+    if profile.cycle_sync_code:
+        lines.append(
+            f"• Код синхронизации: <code>{escape(profile.cycle_sync_code)}</code> "
+            "(расшифрован)"
+        )
+    elif profile.flow_app_code:
+        lines.append(f"• Код Lira: <code>{escape(profile.flow_app_code)}</code>")
+    if profile.last_period_start:
+        lines.append(
+            f"• Последние месячные: <b>{profile.last_period_start:%d.%m.%Y}</b>"
+        )
     lines.append(
         f"• Цикл: {profile.cycle_length_days or '—'} дн., "
         f"месячные {profile.period_length_days or '—'} дн."
