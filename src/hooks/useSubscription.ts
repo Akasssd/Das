@@ -4,12 +4,20 @@ import { useApp } from '../AppContext';
 import { DEFAULT_SUBSCRIPTION, Subscription, SubscriptionTier } from '../types';
 import { activateCode } from '../utils/activation';
 
+export type SubscriptionType = 'premium' | 'basic_box' | 'vip_box' | 'none';
+
 export interface UseSubscriptionApi {
   subscription: Subscription;
   tier: SubscriptionTier;
+  /** Friendlier alias used by gates / settings: which kind of plan is active. */
+  subscriptionType: SubscriptionType;
   isActive: boolean;
   isBasic: boolean;
   isVip: boolean;
+  /** True when any active plan unlocks Premium features (premium / basic / vip). */
+  isPremium: boolean;
+  /** True when an active plan ships physical boxes (basic / vip). */
+  isBoxActive: boolean;
   daysLeft: number;
   /**
    * Send the user-entered activation code to the FlowCare API. On success
@@ -68,9 +76,15 @@ export const useSubscription = (): UseSubscriptionApi => {
       }
       const renewsAtIso = `${res.expires}T00:00:00.000Z`;
       const nowIso = new Date().toISOString();
+      const productId =
+        res.tariff === 'vip'
+          ? 'vip_monthly'
+          : res.tariff === 'premium'
+            ? 'premium_monthly'
+            : 'basic_monthly';
       await updateSubscription({
         tier: res.tariff,
-        productId: res.tariff === 'vip' ? 'vip_monthly' : 'basic_monthly',
+        productId,
         startedAt: nowIso,
         renewsAt: renewsAtIso,
         cancelled: false,
@@ -83,13 +97,30 @@ export const useSubscription = (): UseSubscriptionApi => {
   );
 
   const active = isActiveNow(sub);
+  const isBasic = active && sub.tier === 'basic';
+  const isVip = active && sub.tier === 'vip';
+  const isBoxActive = isBasic || isVip;
+  const isPremiumOnly = active && sub.tier === 'premium';
+  const isPremium = isPremiumOnly || isBoxActive;
+  const subscriptionType: SubscriptionType = !active
+    ? 'none'
+    : sub.tier === 'vip'
+      ? 'vip_box'
+      : sub.tier === 'basic'
+        ? 'basic_box'
+        : sub.tier === 'premium'
+          ? 'premium'
+          : 'none';
 
   return {
     subscription: sub,
     tier: sub.tier,
+    subscriptionType,
     isActive: active,
-    isBasic: active && sub.tier === 'basic',
-    isVip: active && sub.tier === 'vip',
+    isBasic,
+    isVip,
+    isPremium,
+    isBoxActive,
     daysLeft: computeDaysLeft(sub),
     activate,
   };

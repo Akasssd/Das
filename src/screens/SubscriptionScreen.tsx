@@ -74,9 +74,73 @@ const MysteryTierCard: React.FC<MysteryTierCardProps> = ({
   );
 };
 
+interface PremiumCardProps {
+  active?: boolean;
+  onPress: () => void;
+}
+
+const PremiumCard: React.FC<PremiumCardProps> = ({ active, onPress }) => {
+  return (
+    <View
+      style={[
+        stylesShared.card,
+        stylesShared.premiumCard,
+        active && { borderColor: '#FFFFFF', borderWidth: 2 },
+      ]}
+    >
+      <View style={stylesShared.premiumGlowA} />
+      <View style={stylesShared.premiumGlowB} />
+      <View style={stylesShared.premiumBadgeRow}>
+        <View style={stylesShared.premiumBadge}>
+          <Text style={stylesShared.premiumBadgeText}>NEW · Цифровой</Text>
+        </View>
+      </View>
+      <View style={stylesShared.cardTopRow}>
+        <Text style={[stylesShared.cardTitle, { color: '#FFFFFF' }]}>
+          Lira Premium
+        </Text>
+        <Text style={[stylesShared.cardPrice, { color: '#FFFFFF' }]}>
+          199₽/мес
+        </Text>
+      </View>
+      <Text style={[stylesShared.cardBody, { color: 'rgba(255,255,255,0.92)' }]}>
+        Расширенная аналитика цикла, прогноз овуляции, экспорт данных,
+        персональные гайды. Всё в твоём телефоне.
+      </Text>
+      <View style={stylesShared.featureList}>
+        {[
+          'Графики температуры и симптомов',
+          'Детальный прогноз овуляции',
+          'Экспорт циклов в PDF / CSV',
+          'Персональные гайды и статьи',
+        ].map((line) => (
+          <Text key={line} style={stylesShared.featureLine}>
+            ✦ {line}
+          </Text>
+        ))}
+      </View>
+      <Pressable
+        style={[stylesShared.cardButton, stylesShared.premiumButton]}
+        onPress={onPress}
+      >
+        <Text style={[stylesShared.cardButtonText, { color: '#5B47B7' }]}>
+          {active ? 'Управление подпиской' : 'Попробовать за 199 ₽/мес'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+};
+
 export const SubscriptionScreen: React.FC = () => {
   const { colors, data } = useApp();
-  const { subscription, tier, isActive, daysLeft, activate } = useSubscription();
+  const {
+    subscription,
+    tier,
+    isActive,
+    isPremium,
+    daysLeft,
+    activate,
+  } = useSubscription();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [code, setCode] = useState('');
@@ -125,15 +189,44 @@ export const SubscriptionScreen: React.FC = () => {
     });
   };
 
+  const onPressPremium = () => {
+    if (tier === 'premium' && isActive) {
+      navigation.navigate('ManageSubscription');
+      return;
+    }
+    Alert.alert(
+      'Lira Premium',
+      'Оплата в приложении скоро заработает. Пока напиши нам в Lira BOX — пришлём код активации Premium.',
+      [
+        { text: 'Закрыть', style: 'cancel' },
+        {
+          text: 'Открыть Lira BOX',
+          onPress: () =>
+            Linking.openURL('https://t.me/lowerBsk24_bot?start=premium').catch(
+              () => {
+                Alert.alert('Не получилось открыть Telegram');
+              },
+            ),
+        },
+      ],
+    );
+  };
+
   const onActivate = async () => {
     setSubmitting(true);
     try {
       const res = await activate(code);
       if (res.ok) {
         setCode('');
+        const tariffName =
+          res.tier === 'vip'
+            ? 'Полная симфония'
+            : res.tier === 'basic'
+              ? 'Твой ритм'
+              : 'Lira Premium';
         Alert.alert(
           'Подписка активирована',
-          `Тариф: ${res.tier === 'vip' ? 'Полная симфония' : 'Твой ритм'}. Действует до ${fmtDate(`${res.expires}T00:00:00.000Z`)}.`,
+          `Тариф: ${tariffName}. Действует до ${fmtDate(`${res.expires}T00:00:00.000Z`)}.`,
         );
         return;
       }
@@ -161,7 +254,11 @@ export const SubscriptionScreen: React.FC = () => {
           <View style={styles.statusCard}>
             <Text style={styles.statusEyebrow}>Подписка активна</Text>
             <Text style={styles.statusTitle}>
-              {tier === 'vip' ? 'Полная симфония' : 'Твой ритм'}
+              {tier === 'vip'
+                ? 'Полная симфония'
+                : tier === 'basic'
+                  ? 'Твой ритм'
+                  : 'Lira Premium'}
             </Text>
             <View style={styles.statusRow}>
               <Text style={styles.statusKey}>Действует до</Text>
@@ -176,6 +273,11 @@ export const SubscriptionScreen: React.FC = () => {
             </Pressable>
           </View>
         ) : null}
+
+        <PremiumCard
+          active={isPremium && tier === 'premium'}
+          onPress={onPressPremium}
+        />
 
         <MysteryTierCard
           title="Твой ритм"
@@ -314,6 +416,61 @@ const stylesShared = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
+  },
+  premiumCard: {
+    backgroundColor: '#5B47B7',
+    borderColor: 'rgba(255,255,255,0.25)',
+    borderWidth: 1,
+    shadowColor: '#5B47B7',
+    overflow: 'hidden',
+  },
+  premiumGlowA: {
+    position: 'absolute',
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    backgroundColor: '#7C5BFF',
+    opacity: 0.55,
+    top: -70,
+    right: -60,
+  },
+  premiumGlowB: {
+    position: 'absolute',
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    backgroundColor: '#3CB5F1',
+    opacity: 0.4,
+    bottom: -60,
+    left: -40,
+  },
+  premiumBadgeRow: {
+    flexDirection: 'row',
+    marginBottom: 6,
+  },
+  premiumBadge: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  premiumBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+  },
+  featureList: {
+    marginTop: 14,
+    marginBottom: 4,
+  },
+  featureLine: {
+    color: 'rgba(255,255,255,0.95)',
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  premiumButton: {
+    backgroundColor: '#FFFFFF',
   },
 });
 

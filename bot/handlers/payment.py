@@ -29,6 +29,12 @@ def _tariff_keyboard() -> InlineKeyboardMarkup:
         inline_keyboard=[
             [
                 InlineKeyboardButton(
+                    text=f"Premium — {TARIFF_META[Tariff.PREMIUM]['price']}₽/мес",
+                    callback_data="tariff:premium",
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     text=f"Базовый — {TARIFF_META[Tariff.BASIC]['price']}₽/мес",
                     callback_data="tariff:basic",
                 )
@@ -46,6 +52,9 @@ def _tariff_keyboard() -> InlineKeyboardMarkup:
 async def show_tariffs(message: Message) -> None:
     text = (
         "<b>Шаг 7/7. Выбери тариф</b>\n\n"
+        "✨ <b>Lira Premium — 199₽/мес</b>\n"
+        "Цифровой тариф: расширенная аналитика цикла, прогноз овуляции, "
+        "экспорт в PDF/CSV, гайды. Без бокса.\n\n"
         "🌸 <b>Базовый — 999₽/мес</b>\n"
         "До 5 предметов: средства гигиены, шоколадка, 1 средство ухода.\n\n"
         "💎 <b>VIP — 1999₽/мес</b>\n"

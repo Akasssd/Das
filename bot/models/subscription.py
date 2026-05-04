@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 
 class Tariff(enum.Enum):
+    PREMIUM = "premium"
     BASIC = "basic"
     VIP = "vip"
 

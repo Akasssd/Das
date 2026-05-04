@@ -15,6 +15,12 @@ from bot.services.subscriptions import create_subscription
 log = logging.getLogger(__name__)
 
 TARIFF_META: dict[Tariff, dict] = {
+    Tariff.PREMIUM: {
+        "title": "Lira Premium — 199₽/мес",
+        "description": "Цифровой тариф: расширенная аналитика, прогноз "
+        "овуляции, экспорт PDF/CSV, гайды. Без бокса.",
+        "price": 199,
+    },
     Tariff.BASIC: {
         "title": "Базовый бокс — 999₽/мес",
         "description": "До 5 предметов: гигиена, шоколад, уход. Каждый месяц.",

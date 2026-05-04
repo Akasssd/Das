@@ -152,7 +152,9 @@ export const SettingsScreen: React.FC = () => {
                 ? t('subscription.vipLabel')
                 : tier === 'basic'
                   ? t('subscription.basicLabel')
-                  : t('manage.tierFree')}
+                  : tier === 'premium'
+                    ? 'Lira Premium'
+                    : t('manage.tierFree')}
             </Text>
           </View>
           <Pressable

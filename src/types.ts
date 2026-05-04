@@ -66,7 +66,7 @@ export const DEFAULT_PROFILE: Profile = {
   pinHash: null,
 };
 
-export type SubscriptionTier = 'free' | 'basic' | 'vip';
+export type SubscriptionTier = 'free' | 'premium' | 'basic' | 'vip';
 
 export interface Subscription {
   tier: SubscriptionTier;

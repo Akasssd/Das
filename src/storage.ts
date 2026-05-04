@@ -29,12 +29,10 @@ const emptyAppData = (): AppData => ({
 
 const normalize = (parsed: Partial<AppData>): AppData => {
   const rawSub = (parsed.subscription as Partial<Subscription> | undefined) ?? {};
-  // Migrate older 'premium' tier to 'basic'.
-  const tier = rawSub.tier === ('premium' as Subscription['tier']) ? 'basic' : rawSub.tier;
   const subscription: Subscription = {
     ...DEFAULT_SUBSCRIPTION,
     ...rawSub,
-    tier: tier ?? DEFAULT_SUBSCRIPTION.tier,
+    tier: rawSub.tier ?? DEFAULT_SUBSCRIPTION.tier,
   };
   // If a previous expiration date already passed, downgrade to free.
   if (
