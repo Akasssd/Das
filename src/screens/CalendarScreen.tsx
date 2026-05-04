@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -9,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
-import { CalendarView } from '../components/Calendar';
+import { VerticalCalendar } from '../components/VerticalCalendar';
 import { RootStackParamList } from '../navigation';
 import { parseISO } from 'date-fns';
 import { tArray } from '../i18n';
@@ -21,7 +20,6 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 export const CalendarScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { colors, predictions, t, language } = useApp();
-  const [monthOffset, setMonthOffset] = useState(0);
   const styles = makeStyles(colors);
   void language;
   const months = tArray('monthsGenitive');
@@ -74,20 +72,16 @@ export const CalendarScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <WaveBackground colors={colors} />
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
+      <View style={styles.content}>
         {renderHero()}
-        <CalendarView
-          monthOffset={monthOffset}
-          onChangeMonthOffset={setMonthOffset}
-          onSelectDay={(date) =>
-            navigation.navigate('DayDetail', { date })
-          }
-        />
-        <View style={{ height: 40 }} />
-      </ScrollView>
+        <View style={styles.calendarWrap}>
+          <VerticalCalendar
+            onSelectDay={(date) =>
+              navigation.navigate('DayDetail', { date })
+            }
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 };
@@ -95,7 +89,8 @@ export const CalendarScreen: React.FC = () => {
 const makeStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     safe: { flex: 1, backgroundColor: colors.background },
-    content: { padding: 16, paddingBottom: 24 },
+    content: { flex: 1, padding: 16, paddingBottom: 0 },
+    calendarWrap: { flex: 1 },
     hero: {
       backgroundColor: colors.card,
       borderRadius: 22,
