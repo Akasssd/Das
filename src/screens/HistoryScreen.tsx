@@ -11,6 +11,7 @@ import { tArray } from '../i18n';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { PremiumGate } from '../components/PremiumGate';
 import { ThemeColors } from '../theme';
+import { exportToPdf } from '../utils/exportPdf';
 import type { RootStackParamList } from '../navigation';
 
 type Nav = NativeStackNavigationProp<RootStackParamList, 'History'>;
@@ -52,6 +53,15 @@ export const HistoryScreen: React.FC = () => {
       <WaveBackground colors={colors} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.h1}>{t('history.title')}</Text>
+
+        <Pressable
+          style={styles.exportBtn}
+          onPress={() => {
+            void exportToPdf(data, 'history');
+          }}
+        >
+          <Text style={styles.exportBtnText}>Экспорт истории в PDF</Text>
+        </Pressable>
 
         {history.length === 0 && (
           <View style={styles.empty}>
@@ -125,6 +135,21 @@ const makeStyles = (colors: ThemeColors) =>
       borderColor: colors.border,
     },
     muted: { color: colors.textMuted, fontSize: 14, lineHeight: 20 },
+    exportBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      marginTop: 6,
+      marginBottom: 10,
+    },
+    exportBtnText: {
+      color: colors.primaryText,
+      fontWeight: '700',
+      fontSize: 14,
+      letterSpacing: 0.3,
+    },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

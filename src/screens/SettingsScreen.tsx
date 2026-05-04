@@ -22,6 +22,7 @@ import { hashPin } from '../pin';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { ThemeColors } from '../theme';
 import { useSubscription } from '../hooks/useSubscription';
+import { exportToPdf } from '../utils/exportPdf';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -31,7 +32,7 @@ export const SettingsScreen: React.FC = () => {
   const { data, updateSettings, updateProfile, resetAll, colors, t } = useApp();
   const navigation = useNavigation<Nav>();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { tier, isActive } = useSubscription();
+  const { tier, isActive, isPremium } = useSubscription();
   const [cycleLen, setCycleLen] = useState(String(data.settings.averageCycleLength));
   const [periodLen, setPeriodLen] = useState(
     String(data.settings.averagePeriodLength),
@@ -173,6 +174,63 @@ export const SettingsScreen: React.FC = () => {
                 : t('settings.openPaywall')}
             </Text>
           </Pressable>
+        </Section>
+
+        <Section title="Экспорт данных" colors={colors}>
+          {isPremium ? (
+            <>
+              <Text style={[styles.rowLabel, { color: colors.textMuted, fontSize: 13, marginBottom: 12 }]}>
+                Полный отчёт в PDF: профиль, прогноз, статистика циклов,
+                симптомы, история и дневник дней — одним файлом.
+              </Text>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => {
+                  void exportToPdf(data, 'full');
+                }}
+              >
+                <Text style={styles.actionBtnText}>
+                  Полный экспорт PDF (всё)
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, { marginTop: 8, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary }]}
+                onPress={() => {
+                  void exportToPdf(data, 'analytics');
+                }}
+              >
+                <Text style={[styles.actionBtnText, { color: colors.primary }]}>
+                  Только аналитика (PDF)
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.actionBtn, { marginTop: 8, backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.primary }]}
+                onPress={() => {
+                  void exportToPdf(data, 'history');
+                }}
+              >
+                <Text style={[styles.actionBtnText, { color: colors.primary }]}>
+                  Только история циклов (PDF)
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.rowLabel, { color: colors.textMuted, fontSize: 13, marginBottom: 12 }]}>
+                Экспорт в PDF доступен с любой подпиской — Lira Premium,
+                Базовая или VIP. Активируй подписку, и ты сможешь сохранить
+                всю историю циклов и аналитику одним файлом.
+              </Text>
+              <Pressable
+                style={styles.actionBtn}
+                onPress={() => navigation.navigate('Subscription' as never)}
+              >
+                <Text style={styles.actionBtnText}>
+                  Открыть подписки
+                </Text>
+              </Pressable>
+            </>
+          )}
         </Section>
 
         <Section title={t('settings.pinTitle')} colors={colors}>

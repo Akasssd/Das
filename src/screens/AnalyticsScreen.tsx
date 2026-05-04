@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseISO } from 'date-fns';
 import Svg, { Circle, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
@@ -13,6 +13,7 @@ import { tArray } from '../i18n';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
 import { PremiumGate } from '../components/PremiumGate';
 import { ThemeColors } from '../theme';
+import { exportToPdf } from '../utils/exportPdf';
 
 export const AnalyticsScreen: React.FC = () => {
   const { data, predictions, colors, t, language } = useApp();
@@ -53,6 +54,15 @@ export const AnalyticsScreen: React.FC = () => {
       <WaveBackground colors={colors} />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.h1}>{t('analytics.title')}</Text>
+
+        <Pressable
+          style={styles.exportBtn}
+          onPress={() => {
+            void exportToPdf(data, 'analytics');
+          }}
+        >
+          <Text style={styles.exportBtnText}>Экспорт аналитики в PDF</Text>
+        </Pressable>
 
         <Text style={styles.section}>{t('analytics.forecast')}</Text>
         <View style={styles.row}>
@@ -348,6 +358,21 @@ const makeStyles = (colors: ThemeColors) =>
       marginBottom: 8,
     },
     row: { flexDirection: 'row', gap: 8, marginBottom: 8 },
+    exportBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: 12,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      marginTop: 6,
+      marginBottom: 6,
+    },
+    exportBtnText: {
+      color: colors.primaryText,
+      fontWeight: '700',
+      fontSize: 14,
+      letterSpacing: 0.3,
+    },
     card: {
       flex: 1,
       backgroundColor: colors.card,
