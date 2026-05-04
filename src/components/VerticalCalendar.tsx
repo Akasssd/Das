@@ -96,6 +96,7 @@ export const VerticalCalendar: React.FC<Props> = ({
 
   return (
     <View style={styles.wrap}>
+      <Legend colors={colors} />
       <View style={styles.weekRow}>
         {weekdays.map((w) => (
           <Text key={w} style={styles.weekday}>
@@ -232,20 +233,72 @@ const DayCell: React.FC<DayCellProps> = ({
 
   return (
     <View style={styles.cellWrap}>
-      {isToday ? <Text style={styles.todayChip}>сег.</Text> : null}
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          circleStyle,
-          isSelected && {
-            borderColor: colors.today,
-            borderWidth: 2,
-          },
-          pressed && { opacity: 0.7 },
-        ]}
-      >
-        <Text style={textStyle}>{date.getDate()}</Text>
-      </Pressable>
+      <View style={isToday ? styles.todayRing : undefined}>
+        <Pressable
+          onPress={onPress}
+          style={({ pressed }) => [
+            circleStyle,
+            isSelected && {
+              borderColor: colors.today,
+              borderWidth: 2,
+            },
+            pressed && { opacity: 0.7 },
+          ]}
+        >
+          <Text style={textStyle}>{date.getDate()}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+};
+
+const Legend: React.FC<{ colors: ThemeColors }> = ({ colors }) => {
+  const styles = makeStyles(colors);
+  const items: { swatch: React.ReactNode; label: string }[] = [
+    {
+      swatch: <View style={[styles.swatch, { backgroundColor: colors.period }]} />,
+      label: 'Месячные',
+    },
+    {
+      swatch: (
+        <View
+          style={[
+            styles.swatch,
+            {
+              backgroundColor: 'transparent',
+              borderColor: colors.predictedPeriod,
+              borderWidth: 2,
+            },
+          ]}
+        />
+      ),
+      label: 'Прогноз',
+    },
+    {
+      swatch: <View style={[styles.swatch, { backgroundColor: colors.ovulation }]} />,
+      label: 'Овуляция',
+    },
+    {
+      swatch: <View style={[styles.swatch, { backgroundColor: colors.primary }]} />,
+      label: 'Пик',
+    },
+    {
+      swatch: (
+        <View style={styles.legendTodayRing}>
+          <View style={[styles.swatch, styles.swatchInner]} />
+        </View>
+      ),
+      label: 'Сегодня',
+    },
+  ];
+  return (
+    <View style={styles.legendRow}>
+      {items.map((it) => (
+        <View key={it.label} style={styles.legendItem}>
+          {it.swatch}
+          <Text style={styles.legendLabel}>{it.label}</Text>
+        </View>
+      ))}
     </View>
   );
 };
@@ -321,12 +374,55 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.text,
       fontWeight: '500',
     },
-    todayChip: {
-      position: 'absolute',
-      top: -2,
-      fontSize: 10,
-      color: colors.primary,
-      fontWeight: '700',
-      letterSpacing: 0.5,
+    todayRing: {
+      width: CIRCLE + 8,
+      height: CIRCLE + 8,
+      borderRadius: (CIRCLE + 8) / 2,
+      borderWidth: 1.5,
+      borderColor: colors.today,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    legendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 8,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+      justifyContent: 'space-between',
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 3,
+      paddingRight: 4,
+    },
+    legendLabel: {
+      marginLeft: 6,
+      fontSize: 12,
+      color: colors.textMuted,
+      letterSpacing: 0.2,
+    },
+    swatch: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+    },
+    swatchInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: 'transparent',
+    },
+    legendTodayRing: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: colors.today,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
