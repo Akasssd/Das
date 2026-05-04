@@ -7,6 +7,7 @@ compute exactly when the next box should be assembled.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandObject, CommandStart
@@ -48,11 +49,12 @@ async def _apply_code(message: Message, code: str) -> None:
         profile.period_length_days = payload.period_length
         profile.cycle_sync_code = code.upper()
 
+    period_end = payload.start_date + timedelta(days=max(payload.period_length - 1, 0))
     await message.answer(
         "Готово, цикл синхронизирован 💫\n\n"
-        f"• Последние месячные: <b>{payload.start_date:%d.%m.%Y}</b>\n"
-        f"• Средняя длина цикла: <b>{payload.cycle_length} дн.</b>\n"
-        f"• Средняя длина месячных: <b>{payload.period_length} дн.</b>\n\n"
+        f"• Месячные: <b>{payload.start_date:%d.%m.%Y}</b> → "
+        f"<b>{period_end:%d.%m.%Y}</b> ({payload.period_length} дн.)\n"
+        f"• Средняя длина цикла: <b>{payload.cycle_length} дн.</b>\n\n"
         "Я учту это при сборке твоего следующего бокса.",
         parse_mode="HTML",
     )

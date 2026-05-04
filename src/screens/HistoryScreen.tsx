@@ -5,9 +5,11 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
+import { useSubscription } from '../hooks/useSubscription';
 import { computeCycleHistory } from '../cycle';
 import { tArray } from '../i18n';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
+import { PremiumGate } from '../components/PremiumGate';
 import { ThemeColors } from '../theme';
 import type { RootStackParamList } from '../navigation';
 
@@ -15,6 +17,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList, 'History'>;
 
 export const HistoryScreen: React.FC = () => {
   const { data, colors, t, language } = useApp();
+  const { isPremium } = useSubscription();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const nav = useNavigation<Nav>();
   void language;
@@ -28,6 +31,21 @@ export const HistoryScreen: React.FC = () => {
     const d = parseISO(iso);
     return `${d.getDate()} ${months[d.getMonth()] ?? ''} ${d.getFullYear()}`;
   };
+
+  if (!isPremium) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <WaveBackground colors={colors} />
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.h1}>{t('history.title')}</Text>
+          <PremiumGate
+            feature="История циклов"
+            body="Полная летопись твоих циклов: длительности, симптомы, кратко и по фазам. Открывается с любой подпиской — Premium / Базовая / VIP."
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>

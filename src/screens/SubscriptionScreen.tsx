@@ -77,33 +77,58 @@ const MysteryTierCard: React.FC<MysteryTierCardProps> = ({
 interface PremiumCardProps {
   active?: boolean;
   onPress: () => void;
+  colors: ThemeColors;
 }
 
-const PremiumCard: React.FC<PremiumCardProps> = ({ active, onPress }) => {
+const PremiumCard: React.FC<PremiumCardProps> = ({ active, onPress, colors }) => {
   return (
     <View
       style={[
         stylesShared.card,
-        stylesShared.premiumCard,
-        active && { borderColor: '#FFFFFF', borderWidth: 2 },
+        {
+          backgroundColor: colors.surface,
+          borderColor: active ? colors.primary : colors.border,
+          borderWidth: active ? 1.5 : 1,
+          shadowColor: colors.primary,
+          overflow: 'hidden',
+        },
       ]}
     >
-      <View style={stylesShared.premiumGlowA} />
-      <View style={stylesShared.premiumGlowB} />
+      <View
+        style={[
+          stylesShared.premiumGlowA,
+          { backgroundColor: colors.fertile, opacity: 0.7 },
+        ]}
+      />
+      <View
+        style={[
+          stylesShared.premiumGlowB,
+          { backgroundColor: colors.ovulation, opacity: 0.55 },
+        ]}
+      />
       <View style={stylesShared.premiumBadgeRow}>
-        <View style={stylesShared.premiumBadge}>
-          <Text style={stylesShared.premiumBadgeText}>NEW · Цифровой</Text>
+        <View
+          style={[
+            stylesShared.premiumBadge,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <Text
+            style={[stylesShared.premiumBadgeText, { color: colors.primary }]}
+          >
+            NEW · Цифровой
+          </Text>
         </View>
       </View>
       <View style={stylesShared.cardTopRow}>
-        <Text style={[stylesShared.cardTitle, { color: '#FFFFFF' }]}>
+        <Text style={[stylesShared.cardTitle, { color: colors.text }]}>
           Lira Premium
         </Text>
-        <Text style={[stylesShared.cardPrice, { color: '#FFFFFF' }]}>
+        <Text style={[stylesShared.cardPrice, { color: colors.text }]}>
           199₽/мес
         </Text>
       </View>
-      <Text style={[stylesShared.cardBody, { color: 'rgba(255,255,255,0.92)' }]}>
+      <Text style={[stylesShared.cardBody, { color: colors.text }]}>
         Расширенная аналитика цикла, прогноз овуляции, экспорт данных,
         персональные гайды. Всё в твоём телефоне.
       </Text>
@@ -114,16 +139,22 @@ const PremiumCard: React.FC<PremiumCardProps> = ({ active, onPress }) => {
           'Экспорт циклов в PDF / CSV',
           'Персональные гайды и статьи',
         ].map((line) => (
-          <Text key={line} style={stylesShared.featureLine}>
+          <Text
+            key={line}
+            style={[stylesShared.featureLine, { color: colors.text }]}
+          >
             ✦ {line}
           </Text>
         ))}
       </View>
       <Pressable
-        style={[stylesShared.cardButton, stylesShared.premiumButton]}
+        style={[
+          stylesShared.cardButton,
+          { backgroundColor: colors.primary },
+        ]}
         onPress={onPress}
       >
-        <Text style={[stylesShared.cardButtonText, { color: '#5B47B7' }]}>
+        <Text style={[stylesShared.cardButtonText, { color: colors.primaryText }]}>
           {active ? 'Управление подпиской' : 'Попробовать за 199 ₽/мес'}
         </Text>
       </Pressable>
@@ -146,20 +177,36 @@ export const SubscriptionScreen: React.FC = () => {
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const syncCode = useMemo(() => {
+  const syncInfo = useMemo(() => {
     const starts = findPeriodStarts(data.logs);
     const startDate = starts.length > 0 ? starts[starts.length - 1] : null;
     if (!startDate) return null;
     try {
-      return encodeCycleCode({
+      const code = encodeCycleCode({
         startDate,
         cycleLength: data.settings.averageCycleLength,
         periodLength: data.settings.averagePeriodLength,
       });
+      const periodLength = Math.max(1, data.settings.averagePeriodLength);
+      const endIso = (() => {
+        const d = new Date(`${startDate}T00:00:00Z`);
+        d.setUTCDate(d.getUTCDate() + periodLength - 1);
+        return d.toISOString().slice(0, 10);
+      })();
+      const fmtDate = (iso: string) => {
+        const [y, m, day] = iso.split('-');
+        return `${day}.${m}.${y}`;
+      };
+      return {
+        code,
+        startLabel: fmtDate(startDate),
+        endLabel: fmtDate(endIso),
+      };
     } catch {
       return null;
     }
   }, [data.logs, data.settings.averageCycleLength, data.settings.averagePeriodLength]);
+  const syncCode = syncInfo?.code ?? null;
 
   const copySyncCode = async () => {
     if (!syncCode) return;
@@ -277,6 +324,7 @@ export const SubscriptionScreen: React.FC = () => {
         <PremiumCard
           active={isPremium && tier === 'premium'}
           onPress={onPressPremium}
+          colors={colors}
         />
 
         <MysteryTierCard
@@ -304,15 +352,20 @@ export const SubscriptionScreen: React.FC = () => {
         <View style={styles.codeCard}>
           <Text style={styles.codeTitle}>Код синхронизации цикла</Text>
           <Text style={styles.codeHint}>
-            Этот код описывает дату последних месячных, длину цикла и длину
-            месячных. Пришли его в Lira BOX, чтобы он точно знал, когда собирать
-            и присылать твою коробку.
+            Внутри кода — <Text style={{ fontWeight: '700' }}>дата начала</Text> и{' '}
+            <Text style={{ fontWeight: '700' }}>дата конца</Text> твоих последних
+            месячных и средняя длина цикла. Это{' '}
+            <Text style={{ fontWeight: '700' }}>не</Text> код активации подписки —
+            нужен, чтобы Lira BOX знал, когда отправить тебе коробку.
           </Text>
-          {syncCode ? (
+          {syncCode && syncInfo ? (
             <>
               <View style={styles.syncBadge}>
                 <Text style={styles.syncBadgeText}>{syncCode}</Text>
               </View>
+              <Text style={[styles.codeHint, { textAlign: 'center', marginTop: 8 }]}>
+                Месячные: {syncInfo.startLabel} → {syncInfo.endLabel}
+              </Text>
               <Pressable style={styles.activateButton} onPress={copySyncCode}>
                 <Text style={styles.activateButtonText}>
                   Скопировать код
@@ -417,20 +470,11 @@ const stylesShared = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
-  premiumCard: {
-    backgroundColor: '#5B47B7',
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderWidth: 1,
-    shadowColor: '#5B47B7',
-    overflow: 'hidden',
-  },
   premiumGlowA: {
     position: 'absolute',
     width: 220,
     height: 220,
     borderRadius: 110,
-    backgroundColor: '#7C5BFF',
-    opacity: 0.55,
     top: -70,
     right: -60,
   },
@@ -439,8 +483,6 @@ const stylesShared = StyleSheet.create({
     width: 180,
     height: 180,
     borderRadius: 90,
-    backgroundColor: '#3CB5F1',
-    opacity: 0.4,
     bottom: -60,
     left: -40,
   },
@@ -449,13 +491,11 @@ const stylesShared = StyleSheet.create({
     marginBottom: 6,
   },
   premiumBadge: {
-    backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   premiumBadgeText: {
-    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.6,
@@ -465,12 +505,8 @@ const stylesShared = StyleSheet.create({
     marginBottom: 4,
   },
   featureLine: {
-    color: 'rgba(255,255,255,0.95)',
     fontSize: 14,
     lineHeight: 22,
-  },
-  premiumButton: {
-    backgroundColor: '#FFFFFF',
   },
 });
 

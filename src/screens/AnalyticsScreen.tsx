@@ -4,16 +4,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseISO } from 'date-fns';
 import Svg, { Circle, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import { useApp } from '../AppContext';
+import { useSubscription } from '../hooks/useSubscription';
 import {
   computeCycleStats,
   countSymptoms,
 } from '../cycle';
 import { tArray } from '../i18n';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
+import { PremiumGate } from '../components/PremiumGate';
 import { ThemeColors } from '../theme';
 
 export const AnalyticsScreen: React.FC = () => {
   const { data, predictions, colors, t, language } = useApp();
+  const { isPremium } = useSubscription();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   void language;
 
@@ -29,6 +32,21 @@ export const AnalyticsScreen: React.FC = () => {
     const d = parseISO(iso);
     return `${d.getDate()} ${months[d.getMonth()] ?? ''}`;
   };
+
+  if (!isPremium) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <WaveBackground colors={colors} />
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={styles.h1}>{t('analytics.title')}</Text>
+          <PremiumGate
+            feature="Расширенная аналитика"
+            body="Графики цикла, статистика симптомов, средние длины циклов и месячных, irregular-флаг, прогноз овуляции. Открывается с любой подпиской — Premium / Базовая / VIP."
+          />
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
