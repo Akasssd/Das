@@ -25,7 +25,7 @@ import {
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
 import { WaveBackground } from '../components/WaveBackground';
-import { FlowQuickLog } from '../components/FlowQuickLog';
+import { PeriodStartedButton } from '../components/PeriodStartedButton';
 import { useCycleCorrection } from '../hooks/useCycleCorrection';
 
 const ruDayWord = (n: number): string => {
@@ -438,7 +438,7 @@ const TodayInner: React.FC<TodayInnerProps> = ({
             <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
           </View>
         ) : (
-          <FlowQuickLog highlight={arrivedHighlight} colors={colors} />
+          <PeriodStartedButton highlight={arrivedHighlight} colors={colors} />
         )}
 
         {isVip && vipShipDate ? (
