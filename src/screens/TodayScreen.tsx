@@ -175,15 +175,23 @@ export const TodayScreen: React.FC = () => {
     return !!(log && log.flow && log.flow !== 'none');
   })();
 
-  // Show the "did your period start today?" prompt only when today is near
-  // the predicted next-period start (±2 days) and the user hasn't already
-  // logged a flow for today.
+  // Show the "did your period start today?" prompt either:
+  //  • when today is within ±2 days of the *next* predicted period start, or
+  //  • when today falls inside the currently-expected (but unlogged) period
+  //    window. The cycle predictor rolls `nextPeriodStart` forward by a full
+  //    cycle once the expected start has already passed, so a "late" user
+  //    is detectable by `daysUntilNextPeriod` being close to a full cycle —
+  //    specifically in `[cycleLen - periodLen, cycleLen)`.
   const showConfirmCard = (() => {
     if (todayAlreadyLogged) return false;
     if (confirmDismissed) return false;
     const days = predictions.daysUntilNextPeriod;
     if (days === null) return false;
-    return days <= 2 && days >= -7;
+    if (days >= 0 && days <= 2) return true;
+    const cLen = predictions.effectiveCycleLength;
+    const pLen = predictions.effectivePeriodLength;
+    if (days >= cLen - pLen && days < cLen) return true;
+    return false;
   })();
 
   const onConfirmYes = async () => {
