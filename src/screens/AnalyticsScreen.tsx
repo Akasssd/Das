@@ -1,13 +1,26 @@
 import React, { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { parseISO } from 'date-fns';
-import Svg, { Circle, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient,
+  Path,
+  Polyline,
+  Rect,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import { useApp } from '../AppContext';
 import { useSubscription } from '../hooks/useSubscription';
 import {
+  buildPhaseSegments,
+  computeCycleHistory,
   computeCycleStats,
   countSymptoms,
+  CycleHistoryEntry,
 } from '../cycle';
 import { tArray } from '../i18n';
 import { SERIF_STACK, WaveBackground } from '../components/WaveBackground';
@@ -26,6 +39,7 @@ export const AnalyticsScreen: React.FC = () => {
     [data.logs, data.settings],
   );
   const symptomCounts = useMemo(() => countSymptoms(data.logs), [data.logs]);
+  const history = useMemo(() => computeCycleHistory(data.logs), [data.logs]);
 
   const months = tArray('monthsGenitive');
   const fmtDate = (iso: string | null): string => {
@@ -33,6 +47,31 @@ export const AnalyticsScreen: React.FC = () => {
     const d = parseISO(iso);
     return `${d.getDate()} ${months[d.getMonth()] ?? ''}`;
   };
+
+  const regularity: 'stable' | 'variable' | 'learning' =
+    predictions.averageSource !== 'logs' || stats.recentCyclesUsed < 3
+      ? 'learning'
+      : stats.irregular
+        ? 'variable'
+        : 'stable';
+  const regularityLabel =
+    regularity === 'stable'
+      ? t('analytics.regularStable')
+      : regularity === 'variable'
+        ? t('analytics.regularVariable')
+        : t('analytics.regularLearning');
+  const regularityHint =
+    regularity === 'stable'
+      ? t('analytics.regularityHintStable')
+      : regularity === 'variable'
+        ? t('analytics.regularityHintVariable')
+        : t('analytics.regularityHintLearning');
+  const regularityTint =
+    regularity === 'stable'
+      ? colors.fertile
+      : regularity === 'variable'
+        ? colors.danger
+        : colors.textMuted;
 
   if (!isPremium) {
     return (
@@ -65,18 +104,25 @@ export const AnalyticsScreen: React.FC = () => {
         </Pressable>
 
         <Text style={styles.section}>{t('analytics.forecast')}</Text>
-        <View style={styles.row}>
-          <ForecastCard
-            label={t('analytics.nextPeriod')}
-            value={fmtDate(predictions.nextPeriodStart)}
+        <View style={styles.heroCard}>
+          <HeroForecast
             colors={colors}
-            tint={colors.period}
-          />
-          <ForecastCard
-            label={t('analytics.nextOvulation')}
-            value={fmtDate(predictions.ovulation)}
-            colors={colors}
-            tint={colors.ovulation}
+            cycleDay={predictions.cycleDay}
+            cycleLen={predictions.effectiveCycleLength}
+            nextPeriod={fmtDate(predictions.nextPeriodStart)}
+            nextOvulation={fmtDate(predictions.ovulation)}
+            regularityLabel={regularityLabel}
+            regularityHint={regularityHint}
+            regularityTint={regularityTint}
+            currentLabel={t('analytics.currentCycle')}
+            dayLabel={
+              predictions.cycleDay
+                ? t('analytics.currentDay', { n: predictions.cycleDay })
+                : '—'
+            }
+            nextPeriodLabel={t('analytics.nextPeriod')}
+            nextOvulationLabel={t('analytics.nextOvulation')}
+            regularityTitle={t('analytics.regularity')}
           />
         </View>
 
@@ -100,6 +146,46 @@ export const AnalyticsScreen: React.FC = () => {
             colors={colors}
           />
         </View>
+
+        <Text style={styles.section}>{t('analytics.cycleTrendsTitle')}</Text>
+        {history.length > 0 ? (
+          <View style={styles.chartCard}>
+            <CycleTrends
+              history={history}
+              cycleLen={predictions.effectiveCycleLength}
+              periodLen={predictions.effectivePeriodLength}
+              luteal={data.settings.lutealPhaseLength}
+              monthsGen={months}
+              colors={colors}
+            />
+            <View style={styles.legendRow}>
+              <Legend
+                tint={colors.period}
+                label={t('analytics.phaseLegendPeriod')}
+                colors={colors}
+              />
+              <Legend
+                tint={colors.fertile}
+                label={t('analytics.phaseLegendFertile')}
+                colors={colors}
+              />
+              <Legend
+                tint={colors.ovulation}
+                label={t('analytics.phaseLegendOvulation')}
+                colors={colors}
+              />
+            </View>
+            <Text style={[styles.muted, { marginTop: 8 }]}>
+              {t('analytics.cycleTrendsHint')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.chartCard}>
+            <Text style={styles.muted}>
+              {t('analytics.cycleLengthChartHint')}
+            </Text>
+          </View>
+        )}
 
         <Text style={styles.section}>
           {t('analytics.cycleLengthChartTitle')}
@@ -320,6 +406,305 @@ const SymptomsBreakdown: React.FC<{
   );
 };
 
+const HeroForecast: React.FC<{
+  colors: ThemeColors;
+  cycleDay: number | null;
+  cycleLen: number;
+  nextPeriod: string;
+  nextOvulation: string;
+  regularityLabel: string;
+  regularityHint: string;
+  regularityTint: string;
+  currentLabel: string;
+  dayLabel: string;
+  nextPeriodLabel: string;
+  nextOvulationLabel: string;
+  regularityTitle: string;
+}> = ({
+  colors,
+  cycleDay,
+  cycleLen,
+  nextPeriod,
+  nextOvulation,
+  regularityLabel,
+  regularityHint,
+  regularityTint,
+  currentLabel,
+  dayLabel,
+  nextPeriodLabel,
+  nextOvulationLabel,
+  regularityTitle,
+}) => {
+  const W = 280;
+  const H = 130;
+  const ringR = 46;
+  const ringCx = ringR + 14;
+  const ringCy = H / 2;
+  const stroke = 8;
+  const progress =
+    cycleDay !== null && cycleLen > 0
+      ? Math.min(1, Math.max(0, cycleDay / cycleLen))
+      : 0;
+  const circumference = 2 * Math.PI * ringR;
+  const dashOffset = circumference * (1 - progress);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Svg width={ringR * 2 + 28} height={H}>
+        <Defs>
+          <LinearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={colors.period} stopOpacity={1} />
+            <Stop offset="1" stopColor={colors.ovulation} stopOpacity={1} />
+          </LinearGradient>
+        </Defs>
+        <Circle
+          cx={ringCx}
+          cy={ringCy}
+          r={ringR}
+          stroke={colors.border}
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        <Circle
+          cx={ringCx}
+          cy={ringCy}
+          r={ringR}
+          stroke="url(#heroGrad)"
+          strokeWidth={stroke}
+          fill="transparent"
+          strokeLinecap="round"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${ringCx} ${ringCy})`}
+        />
+        <SvgText
+          x={ringCx}
+          y={ringCy - 4}
+          fontSize="11"
+          fill={colors.textMuted}
+          textAnchor="middle"
+        >
+          {currentLabel}
+        </SvgText>
+        <SvgText
+          x={ringCx}
+          y={ringCy + 14}
+          fontSize="18"
+          fontWeight="700"
+          fill={colors.text}
+          textAnchor="middle"
+        >
+          {cycleDay !== null ? String(cycleDay) : '—'}
+        </SvgText>
+      </Svg>
+      <View style={{ flex: 1, paddingLeft: 8 }}>
+        <Text style={{ color: colors.textMuted, fontSize: 11, marginBottom: 2 }}>
+          {dayLabel}
+        </Text>
+        <Text
+          style={{
+            color: colors.period,
+            fontSize: 16,
+            fontWeight: '700',
+            marginBottom: 4,
+          }}
+        >
+          {nextPeriodLabel}: {nextPeriod}
+        </Text>
+        <Text
+          style={{
+            color: colors.ovulation,
+            fontSize: 14,
+            fontWeight: '600',
+            marginBottom: 8,
+          }}
+        >
+          {nextOvulationLabel}: {nextOvulation}
+        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: colors.background,
+            borderRadius: 999,
+            paddingVertical: 4,
+            paddingHorizontal: 10,
+            alignSelf: 'flex-start',
+            borderWidth: 1,
+            borderColor: regularityTint,
+          }}
+        >
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: regularityTint,
+              marginRight: 6,
+            }}
+          />
+          <Text style={{ color: regularityTint, fontSize: 12, fontWeight: '700' }}>
+            {regularityTitle}: {regularityLabel}
+          </Text>
+        </View>
+        <Text
+          style={{
+            color: colors.textMuted,
+            fontSize: 11,
+            marginTop: 6,
+            lineHeight: 14,
+          }}
+        >
+          {regularityHint}
+        </Text>
+      </View>
+    </View>
+  );
+};
+
+const Legend: React.FC<{
+  tint: string;
+  label: string;
+  colors: ThemeColors;
+}> = ({ tint, label, colors }) => (
+  <View
+    style={{ flexDirection: 'row', alignItems: 'center', marginRight: 10 }}
+  >
+    <View
+      style={{
+        width: 10,
+        height: 10,
+        borderRadius: 5,
+        backgroundColor: tint,
+        marginRight: 6,
+      }}
+    />
+    <Text style={{ color: colors.text, fontSize: 12 }}>{label}</Text>
+  </View>
+);
+
+const CycleTrends: React.FC<{
+  history: CycleHistoryEntry[];
+  cycleLen: number;
+  periodLen: number;
+  luteal: number;
+  monthsGen: string[];
+  colors: ThemeColors;
+}> = ({ history, cycleLen, periodLen, luteal, monthsGen, colors }) => {
+  const recent = history.slice(-5);
+  const W = 280;
+  const ROW_H = 22;
+  const GAP = 6;
+  const LABEL_W = 56;
+  const trackX = LABEL_W + 6;
+  const trackW = W - trackX - 4;
+  const todayIso = format(new Date(), 'yyyy-MM-dd');
+
+  const fmtShort = (iso: string): string => {
+    const d = parseISO(iso);
+    return `${d.getDate()} ${monthsGen[d.getMonth()] ?? ''}`.trim();
+  };
+
+  const phaseColor = (phase: 'period' | 'fertile' | 'ovulation' | 'follicular' | 'luteal'): string => {
+    if (phase === 'period') return colors.period;
+    if (phase === 'fertile') return colors.fertile;
+    if (phase === 'ovulation') return colors.ovulation;
+    return colors.backgroundAccent;
+  };
+
+  return (
+    <Svg width={W} height={recent.length * (ROW_H + GAP) + 6}>
+      {recent.map((entry, idx) => {
+        const len = entry.cycleLength ?? cycleLen;
+        const segments = buildPhaseSegments(
+          len,
+          entry.periodLength || periodLen,
+          luteal,
+        );
+        const y = idx * (ROW_H + GAP) + 2;
+        const isCurrent = entry.end === null;
+        const todayDay =
+          isCurrent && entry.start
+            ? Math.min(
+                len,
+                Math.max(
+                  1,
+                  differenceInCalendarDays(parseISO(todayIso), parseISO(entry.start)) + 1,
+                ),
+              )
+            : null;
+        return (
+          <React.Fragment key={`row-${idx}`}>
+            <SvgText
+              x={LABEL_W - 2}
+              y={y + ROW_H / 2 + 4}
+              fontSize="10"
+              fill={colors.textMuted}
+              textAnchor="end"
+            >
+              {fmtShort(entry.start)}
+            </SvgText>
+            <Rect
+              x={trackX}
+              y={y}
+              width={trackW}
+              height={ROW_H}
+              rx={ROW_H / 2}
+              fill={colors.background}
+              stroke={colors.border}
+              strokeWidth={1}
+            />
+            {segments.map((seg, sIdx) => {
+              if (seg.phase === 'unknown') return null;
+              const x = trackX + ((seg.startDay - 1) / len) * trackW;
+              const w = ((seg.endDay - seg.startDay + 1) / len) * trackW;
+              return (
+                <Rect
+                  key={`seg-${idx}-${sIdx}`}
+                  x={x}
+                  y={y + 2}
+                  width={Math.max(2, w - 0.5)}
+                  height={ROW_H - 4}
+                  rx={(ROW_H - 4) / 2}
+                  fill={phaseColor(
+                    seg.phase as
+                      | 'period'
+                      | 'fertile'
+                      | 'ovulation'
+                      | 'follicular'
+                      | 'luteal',
+                  )}
+                  opacity={
+                    seg.phase === 'follicular' || seg.phase === 'luteal' ? 0.4 : 0.95
+                  }
+                />
+              );
+            })}
+            {todayDay !== null && (
+              <Circle
+                cx={trackX + ((todayDay - 1) / len) * trackW}
+                cy={y + ROW_H / 2}
+                r={4}
+                fill={colors.primary}
+                stroke={colors.card}
+                strokeWidth={1.5}
+              />
+            )}
+            <SvgText
+              x={W - 2}
+              y={y + ROW_H / 2 + 4}
+              fontSize="10"
+              fill={colors.textMuted}
+              textAnchor="end"
+            >
+              {entry.cycleLength ? `${entry.cycleLength}д` : '·'}
+            </SvgText>
+          </React.Fragment>
+        );
+      })}
+    </Svg>
+  );
+};
+
 const legendStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -406,6 +791,25 @@ const makeStyles = (colors: ThemeColors) =>
       borderWidth: 1,
       borderColor: colors.border,
       alignItems: 'center',
+    },
+    heroCard: {
+      backgroundColor: colors.card,
+      borderRadius: 22,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+      marginBottom: 8,
+    },
+    legendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: 10,
+      alignSelf: 'flex-start',
     },
     muted: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   });

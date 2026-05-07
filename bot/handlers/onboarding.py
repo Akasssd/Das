@@ -7,7 +7,12 @@ from datetime import datetime
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from bot.db import session_scope
 from bot.keyboards.common import multi_choice, single_choice, yes_no, confirm_keyboard
@@ -120,22 +125,118 @@ def _q(text: str) -> str:
     return f"<b>{text}</b>"
 
 
+# ---- Step 0: 152-FZ consent --------------------------------------------- #
+
+
+CONSENT_TEXT = (
+    "<b>⚠️ Согласие на обработку персональных данных</b>\n\n"
+    "Прежде чем продолжить, нужно одно важное уточнение.\n\n"
+    "Чтобы собрать и привезти твой <b>персональный бокс заботы</b>, "
+    "мне нужно получить от тебя данные: имя, год рождения, город и адрес "
+    "доставки, телефон, особенности цикла, аллергии, предпочтения по "
+    "уходу и питанию.\n\n"
+    "<b>Эти данные используются ТОЛЬКО для:</b>\n"
+    "• подбора содержимого бокса под тебя;\n"
+    "• формирования и доставки бокса курьером;\n"
+    "• напоминаний о датах в этом боте.\n\n"
+    "Я <b>не передаю</b> их третьим лицам и не использую для рекламы или "
+    "перепродажи.\n\n"
+    "Нажимая «Согласна, продолжить», ты подтверждаешь, что тебе "
+    "<b>есть 18 лет</b>, и даёшь согласие на обработку своих "
+    "персональных данных в соответствии с Федеральным законом "
+    "№ 152-ФЗ «О персональных данных» — на цели, описанные выше.\n\n"
+    "Согласие можно отозвать в любой момент, написав <code>/cancel</code>."
+)
+
+
+def _consent_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Согласна, продолжить",
+                    callback_data="consent:accept",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Не сейчас",
+                    callback_data="consent:decline",
+                )
+            ],
+        ]
+    )
+
+
+async def _show_consent(target, state: FSMContext) -> None:
+    await state.set_state(Onboarding.consent)
+    if isinstance(target, CallbackQuery):
+        await target.message.answer(
+            CONSENT_TEXT, parse_mode="HTML", reply_markup=_consent_keyboard()
+        )
+    else:
+        await target.answer(
+            CONSENT_TEXT, parse_mode="HTML", reply_markup=_consent_keyboard()
+        )
+
+
 # ---- Step 1: basic ------------------------------------------------------ #
 
 
 @router.callback_query(F.data == "onboarding:start")
 async def begin(cb: CallbackQuery, state: FSMContext) -> None:
     await _ensure_profile(cb)
-    await state.set_state(Onboarding.name)
-    await cb.message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await _show_consent(cb, state)
     await cb.answer()
 
 
 @router.message(Command("setup"))
 async def begin_via_command(message: Message, state: FSMContext) -> None:
     await _ensure_profile(message)
+    await _show_consent(message, state)
+
+
+@router.callback_query(Onboarding.consent, F.data == "consent:accept")
+async def consent_accept(cb: CallbackQuery, state: FSMContext) -> None:
+    await _save_consent(cb)
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.message.answer(
+        "Спасибо! Поехали 💛", parse_mode="HTML"
+    )
     await state.set_state(Onboarding.name)
-    await message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await cb.message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await cb.answer()
+
+
+async def _save_consent(event) -> None:
+    """Persist 152-FZ consent fact + timestamp to Profile.extra."""
+    user_tg = event.from_user
+    async with session_scope() as session:
+        user = await get_or_create_user(session, user_tg)
+        profile = await get_or_create_profile(session, user)
+        extra = dict(profile.extra or {})
+        extra["consent_personal_data"] = True
+        extra["consent_at"] = datetime.utcnow().isoformat() + "Z"
+        profile.extra = extra
+
+
+@router.callback_query(Onboarding.consent, F.data == "consent:decline")
+async def consent_decline(cb: CallbackQuery, state: FSMContext) -> None:
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.message.answer(
+        "Поняла. Без согласия на обработку данных я, к сожалению, "
+        "не смогу собрать и доставить бокс. Если передумаешь — нажми "
+        "<code>/setup</code> или вернись в меню через <code>/start</code>.",
+        parse_mode="HTML",
+    )
+    await state.clear()
+    await cb.answer()
 
 
 @router.message(Onboarding.name)

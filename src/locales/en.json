@@ -175,7 +175,21 @@
     "symptomsTitle": "Frequent symptoms",
     "symptomsHint": "Add symptoms to your daily logs to see the breakdown.",
     "insufficientData": "Not enough data.",
-    "days": "d"
+    "days": "d",
+    "cycleTrendsTitle": "Cycle trends",
+    "cycleTrendsHint": "Each row is one cycle. Dots are grouped by phase — period, fertile window and ovulation.",
+    "currentCycle": "Current cycle",
+    "regularity": "Regularity",
+    "regularStable": "Stable",
+    "regularVariable": "Variable",
+    "regularLearning": "Learning",
+    "regularityHintStable": "Cycles in the past few months stay within 7 days — predictions are solid.",
+    "regularityHintVariable": "Spread between cycles is over 7 days. Forecast is approximate — keep logging.",
+    "regularityHintLearning": "Need a couple more cycles to compute averages. For now we use your settings.",
+    "phaseLegendPeriod": "Period",
+    "phaseLegendFertile": "Fertile window",
+    "phaseLegendOvulation": "Ovulation",
+    "currentDay": "Day {{n}}"
   },
   "history": {
     "title": "Cycle history",
