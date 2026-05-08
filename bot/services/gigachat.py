@@ -64,21 +64,47 @@ class GigaChatConfig:
         return base64.b64encode(raw).decode("ascii")
 
 
+def _looks_like_authorization_key(value: str) -> tuple[str, str] | None:
+    """Return (client_id, client_secret) if value is base64('cid:secret'), else None.
+
+    Sber's developer cabinet hands users a pre-assembled "Authorization key"
+    (base64 of `client_id:client_secret`, ~96+ chars, ends with `=`).
+    People sometimes paste it into a field labeled "Client Secret" by accident,
+    so we tolerate either label.
+    """
+    if not value or len(value) < 60 or not value.rstrip().endswith("="):
+        return None
+    try:
+        decoded = base64.b64decode(value, validate=True).decode("utf-8")
+    except Exception:
+        return None
+    cid, _, sec = decoded.partition(":")
+    cid, sec = cid.strip(), sec.strip()
+    if cid and sec:
+        return cid, sec
+    return None
+
+
 def _config_from_env() -> GigaChatConfig | None:
     cid = os.environ.get("GIGACHAT_CLIENT_ID", "").strip()
     sec = os.environ.get("GIGACHAT_CLIENT_SECRET", "").strip()
+    auth_key = os.environ.get("GIGACHAT_AUTHORIZATION_KEY", "").strip()
+
+    # 1. Explicit pre-assembled Authorization key.
+    if (parsed := _looks_like_authorization_key(auth_key)) is not None:
+        return GigaChatConfig(client_id=parsed[0], client_secret=parsed[1])
+
+    # 2. User pasted the Authorization key into the SECRET field by mistake.
+    if (parsed := _looks_like_authorization_key(sec)) is not None:
+        return GigaChatConfig(client_id=parsed[0], client_secret=parsed[1])
+
+    # 3. User pasted the Authorization key into the CLIENT_ID field by mistake.
+    if (parsed := _looks_like_authorization_key(cid)) is not None:
+        return GigaChatConfig(client_id=parsed[0], client_secret=parsed[1])
+
+    # 4. Normal split CID + secret.
     if cid and sec:
         return GigaChatConfig(client_id=cid, client_secret=sec)
-    # Fallback: pre-assembled `client_id:client_secret` already base64'd.
-    auth_key = os.environ.get("GIGACHAT_AUTHORIZATION_KEY", "").strip()
-    if auth_key and len(auth_key) > 60 and auth_key.endswith("="):
-        try:
-            decoded = base64.b64decode(auth_key).decode("utf-8")
-            cid2, _, sec2 = decoded.partition(":")
-            if cid2 and sec2:
-                return GigaChatConfig(client_id=cid2, client_secret=sec2)
-        except Exception:
-            log.warning("Invalid GIGACHAT_AUTHORIZATION_KEY (not base64 of cid:secret)")
     return None
 
 
