@@ -3,12 +3,14 @@ from aiogram.fsm.state import State, StatesGroup
 
 
 class Onboarding(StatesGroup):
+    # Step 0: 152-FZ personal data consent (must be granted before anything is
+    # collected — without this we are not allowed to ask for name / address).
+    consent = State()
+
     # Step 1: basic
     name = State()
     birth_year = State()
     city = State()
-    flow_code_choice = State()
-    flow_code_input = State()
     cycle_length = State()
     period_length = State()
 

@@ -24,26 +24,28 @@ export interface ThemeColors {
 }
 
 export const lightColors: ThemeColors = {
+  // Juicier warm cream-peach palette so the background doesn't fade behind
+  // the saturated cycle markers and feels alive on its own.
   mode: 'light',
-  background: '#FBF6EF',
-  backgroundAccent: '#F4EADB',
-  card: '#FFFCF7',
-  surface: '#F6ECDD',
-  text: '#8E6F58',
-  textMuted: '#B59C84',
-  border: '#F1E2CB',
-  primary: '#C99275',
+  background: '#FFF1DD',
+  backgroundAccent: '#FFD7B5',
+  card: '#FFFAF1',
+  surface: '#FFE3C7',
+  text: '#7A5A42',
+  textMuted: '#B08A6A',
+  border: '#F2CFAA',
+  primary: '#C9774E',
   primaryText: '#FFFFFF',
-  period: '#D9A39F',
-  predictedPeriod: '#EDC9BC',
-  ovulation: '#F5D6E6',
-  fertile: '#F8E7C8',
-  follicular: '#F1DDC4',
-  luteal: '#EBD9C2',
-  ringTrack: '#F1E1CC',
-  today: '#8C6B53',
-  danger: '#B5704A',
-  accent: '#C99275',
+  period: '#D26C68',
+  predictedPeriod: '#EDB1A6',
+  ovulation: '#E69BC1',
+  fertile: '#F2C68A',
+  follicular: '#F4D3AE',
+  luteal: '#EBC5A0',
+  ringTrack: '#F2D2B0',
+  today: '#7A4F35',
+  danger: '#A8542F',
+  accent: '#C9774E',
 };
 
 export const darkColors: ThemeColors = {

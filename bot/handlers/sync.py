@@ -1,78 +1,64 @@
-"""/sync handler — accepts a cycle sync code from the Lira app.
+"""Sync handlers — bind a Lira-app device to this Telegram user.
 
-The code carries: last period start date, average cycle length, average
-period length. We persist this on the user's Profile so the scheduler can
-compute exactly when the next box should be assembled.
+Old direction (app → bot via /sync code) was removed.
+New direction is one-way bot → app:
+
+  • App generates a UUIDv4 `device_id` on first sync attempt.
+  • App opens a deep link `t.me/<bot>?start=app_<device_id>`.
+  • This handler stores `device_id` in `Profile.extra` so that the
+    public REST API (`GET /v1/sync/pull?device_id=...`) can return
+    that user's subscription + cycle dates back to the app.
 """
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+import re
+from datetime import datetime
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandObject, CommandStart
+from aiogram.filters import CommandObject, CommandStart
 from aiogram.types import Message
 
 from bot.db import session_scope
-from bot.services.cycle_code import decode_cycle_code
 from bot.services.users import get_or_create_profile, get_or_create_user
 
 log = logging.getLogger(__name__)
 router = Router(name="sync")
 
 
-HELP = (
-    "Чтобы я знал, когда отправлять тебе бокс, открой приложение <b>Lira</b> "
-    "→ экран «Подписка» → «Код синхронизации цикла» → «Скопировать код».\n\n"
-    "Затем пришли мне его сообщением:\n<code>/sync ABCD-EFGH</code>"
-)
+_DEVICE_ID_RE = re.compile(r"^[A-Za-z0-9_\-]{6,64}$")
 
 
-async def _apply_code(message: Message, code: str) -> None:
-    payload = decode_cycle_code(code)
-    if payload is None:
+async def _bind_device(message: Message, device_id: str) -> None:
+    if not _DEVICE_ID_RE.match(device_id):
         await message.answer(
-            "Не получилось разобрать код. Проверь, что скопировала его "
-            "целиком из приложения. Формат — 8 символов, например "
-            "<code>4FGA-9XPP</code>.",
-            parse_mode="HTML",
+            "Не получилось привязать приложение: некорректный код "
+            "устройства. Попробуй ещё раз через приложение Lira → "
+            "«Подписка» → «Синхронизация с Telegram».",
         )
         return
-
     if message.from_user is None:
         return
     async with session_scope() as session:
         user = await get_or_create_user(session, message.from_user)
         profile = await get_or_create_profile(session, user)
-        profile.last_period_start = payload.start_date
-        profile.cycle_length_days = payload.cycle_length
-        profile.period_length_days = payload.period_length
-        profile.cycle_sync_code = code.upper()
-
-    period_end = payload.start_date + timedelta(days=max(payload.period_length - 1, 0))
+        extra = dict(profile.extra or {})
+        extra["synced_app_device_id"] = device_id
+        extra["synced_at"] = datetime.utcnow().isoformat() + "Z"
+        profile.extra = extra
     await message.answer(
-        "Готово, цикл синхронизирован 💫\n\n"
-        f"• Месячные: <b>{payload.start_date:%d.%m.%Y}</b> → "
-        f"<b>{period_end:%d.%m.%Y}</b> ({payload.period_length} дн.)\n"
-        f"• Средняя длина цикла: <b>{payload.cycle_length} дн.</b>\n\n"
-        "Я учту это при сборке твоего следующего бокса.",
-        parse_mode="HTML",
+        "🔗 Готово! Приложение Lira привязано к этому чату.\n\n"
+        "Возвращайся в приложение — подписка и даты цикла подтянутся "
+        "автоматически в течение пары секунд.",
     )
-
-
-@router.message(Command("sync"))
-async def on_sync(message: Message, command: CommandObject) -> None:
-    raw = (command.args or "").strip()
-    if not raw:
-        await message.answer(HELP, parse_mode="HTML")
-        return
-    await _apply_code(message, raw)
 
 
 @router.message(
     CommandStart(deep_link=True),
-    F.text.lower().regexp(r"^/start\s+sync_"),
+    F.text.regexp(r"^/start\s+app_"),
 )
-async def on_start_with_sync(message: Message, command: CommandObject) -> None:
+async def on_start_with_app(message: Message, command: CommandObject) -> None:
     raw = (command.args or "").strip()
-    await _apply_code(message, raw[len("sync_"):])
+    if raw.startswith("app_"):
+        raw = raw[len("app_"):]
+    await _bind_device(message, raw)

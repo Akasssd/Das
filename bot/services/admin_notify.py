@@ -132,7 +132,7 @@ def format_full_profile(user_tg: "TGUser", profile: "Profile") -> str:
         + (str(profile.birth_year) if profile.birth_year else "—")
     )
     lines.append(f"• Город: {_h(profile.city)}")
-    if profile.cycle_sync_code:
+    if False and profile.cycle_sync_code:  # legacy field — no longer surfaced
         lines.append(
             f"• Код синхронизации: <code>{escape(profile.cycle_sync_code)}</code> "
             "(расшифрован)"

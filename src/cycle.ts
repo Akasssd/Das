@@ -223,6 +223,25 @@ export const buildDayMarkers = (
     const periodLen = predictions.effectivePeriodLength;
     const luteal = settings.lutealPhaseLength;
     const horizonDays = 365;
+
+    // The "current expected period" — one cycle behind nextPeriodStart.
+    // For its days we differentiate past vs. future:
+    //  • already passed (and not logged) → show as 'period' (filled red)
+    //  • today / future                    → show as 'predictedPeriod' (ring)
+    // This matches the user expectation that a missed expected day reads as a
+    // real period day, while still-upcoming days read as a forecast.
+    const currentExpectedStart = addDays(
+      parseISO(predictions.nextPeriodStart),
+      -cycleLen,
+    );
+    for (let i = 0; i < periodLen; i++) {
+      const dayDate = addDays(currentExpectedStart, i);
+      const d = fmt(dayDate);
+      if (isBleeding(logs[d])) continue;
+      const isPast = differenceInCalendarDays(today, dayDate) > 0;
+      add(d, isPast ? 'period' : 'predictedPeriod');
+    }
+
     let startCursor = parseISO(predictions.nextPeriodStart);
     while (differenceInCalendarDays(startCursor, today) <= horizonDays) {
       // Predicted bleeding days

@@ -10,11 +10,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
 import { addDays, format, parseISO } from 'date-fns';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useApp } from '../AppContext';
-import { useSubscription } from '../hooks/useSubscription';
-import { RootStackParamList } from '../navigation';
 import { tArray } from '../i18n';
 import {
   buildPhaseSegments,
@@ -25,8 +21,6 @@ import {
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
 import { WaveBackground } from '../components/WaveBackground';
-import { PeriodStartedButton } from '../components/PeriodStartedButton';
-import { useCycleCorrection } from '../hooks/useCycleCorrection';
 
 const ruDayWord = (n: number): string => {
   const a = Math.abs(n) % 100;
@@ -147,24 +141,11 @@ const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
   </Svg>
 );
 
-type Nav = NativeStackNavigationProp<RootStackParamList>;
-
 export const TodayScreen: React.FC = () => {
   const { data, predictions, colors, t, language, upsertLogs } = useApp();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const navigation = useNavigation<Nav>();
-  const { isVip } = useSubscription();
-  const correction = useCycleCorrection();
-  const vipShipDate = useMemo(() => {
-    if (!isVip || !predictions.nextPeriodStart) return null;
-    try {
-      return addDays(parseISO(predictions.nextPeriodStart), -5);
-    } catch {
-      return null;
-    }
-  }, [isVip, predictions.nextPeriodStart]);
 
   const today = new Date();
   const todayKey = format(today, 'yyyy-MM-dd');
@@ -175,15 +156,23 @@ export const TodayScreen: React.FC = () => {
     return !!(log && log.flow && log.flow !== 'none');
   })();
 
-  // Show the "did your period start today?" prompt only when today is near
-  // the predicted next-period start (±2 days) and the user hasn't already
-  // logged a flow for today.
+  // Show the "did your period start today?" prompt either:
+  //  • when today is within ±2 days of the *next* predicted period start, or
+  //  • when today falls inside the currently-expected (but unlogged) period
+  //    window. The cycle predictor rolls `nextPeriodStart` forward by a full
+  //    cycle once the expected start has already passed, so a "late" user
+  //    is detectable by `daysUntilNextPeriod` being close to a full cycle —
+  //    specifically in `[cycleLen - periodLen, cycleLen)`.
   const showConfirmCard = (() => {
     if (todayAlreadyLogged) return false;
     if (confirmDismissed) return false;
     const days = predictions.daysUntilNextPeriod;
     if (days === null) return false;
-    return days <= 2 && days >= -7;
+    if (days >= 0 && days <= 2) return true;
+    const cLen = predictions.effectiveCycleLength;
+    const pLen = predictions.effectivePeriodLength;
+    if (days >= cLen - pLen && days < cLen) return true;
+    return false;
   })();
 
   const onConfirmYes = async () => {
@@ -271,8 +260,6 @@ export const TodayScreen: React.FC = () => {
   const nextOvulationValue = (() => {
     if (!predictions.ovulation) return '—';
     const ovDate = parseISO(predictions.ovulation);
-    // If the ovulation date in `predictions` already passed today, advance by
-    // one cycle so the card always shows an upcoming date.
     let target = ovDate;
     if (target.getTime() < today.getTime() - 1000 * 60 * 60 * 24) {
       target = addDays(target, cycleLen);
@@ -281,90 +268,11 @@ export const TodayScreen: React.FC = () => {
   })();
 
   const isEmpty = !predictions.lastPeriodStart;
-
-  return (
-    <TodayInner
-      isEmpty={isEmpty}
-      dateStr={dateStr}
-      cycleDay={cycleDay}
-      phase={phase}
-      cycleLen={cycleLen}
-      segments={segments}
-      ringSize={ringSize}
-      renderCenter={renderCenter}
-      untilPeriodValue={untilPeriodValue}
-      fertileValue={fertileValue}
-      nextOvulationValue={nextOvulationValue}
-      colors={colors}
-      styles={styles}
-      t={t}
-      insets={insets}
-      showConfirmCard={showConfirmCard}
-      confirmJustSaved={confirmJustSaved}
-      onConfirmYes={onConfirmYes}
-      onConfirmNo={onConfirmNo}
-      isVip={isVip}
-      vipShipDate={vipShipDate}
-      onTapBox={() => navigation.navigate('Subscription' as never)}
-      arrivedHighlight={correction.isAroundPredicted}
-    />
-  );
-};
-
-interface TodayInnerProps {
-  isEmpty: boolean;
-  dateStr: string;
-  cycleDay: number | null;
-  phase: CyclePhase;
-  cycleLen: number;
-  segments: ReturnType<typeof buildPhaseSegments>;
-  ringSize: number;
-  renderCenter: () => React.ReactNode;
-  untilPeriodValue: string;
-  fertileValue: string;
-  nextOvulationValue: string;
-  colors: ThemeColors;
-  styles: ReturnType<typeof makeStyles>;
-  t: (key: string, vars?: Record<string, string | number>) => string;
-  insets: { top: number; right: number; bottom: number; left: number };
-  showConfirmCard: boolean;
-  confirmJustSaved: boolean;
-  onConfirmYes: () => void;
-  onConfirmNo: () => void;
-  isVip: boolean;
-  vipShipDate: Date | null;
-  onTapBox: () => void;
-  arrivedHighlight: boolean;
-}
-
-const TodayInner: React.FC<TodayInnerProps> = ({
-  isEmpty,
-  dateStr,
-  cycleDay,
-  phase,
-  cycleLen,
-  segments,
-  ringSize,
-  renderCenter,
-  untilPeriodValue,
-  fertileValue,
-  nextOvulationValue,
-  colors,
-  styles,
-  t,
-  insets,
-  showConfirmCard,
-  confirmJustSaved,
-  onConfirmYes,
-  onConfirmNo,
-  isVip,
-  vipShipDate,
-  onTapBox,
-  arrivedHighlight,
-}) => {
-  const dash = t('today.placeholderValue');
   const showCycleDay = !isEmpty && cycleDay !== null;
-  const phaseText = isEmpty ? t('today.placeholderPhase') : t(phaseTitleKey(phase));
+  const phaseText = isEmpty
+    ? t('today.placeholderPhase')
+    : t(phaseTitleKey(phase));
+  const dash = t('today.placeholderValue');
   const cardUntil = isEmpty ? dash : untilPeriodValue;
   const cardFertile = isEmpty ? dash : fertileValue;
   const cardOvulation = isEmpty ? dash : nextOvulationValue;
@@ -432,36 +340,6 @@ const TodayInner: React.FC<TodayInnerProps> = ({
             serif={SERIF}
           />
         </View>
-
-        {isEmpty ? (
-          <View style={styles.ctaWrap}>
-            <Text style={styles.ctaHint}>{t('today.noCycleHint')}</Text>
-          </View>
-        ) : (
-          <PeriodStartedButton highlight={arrivedHighlight} colors={colors} />
-        )}
-
-        {isVip && vipShipDate ? (
-          <Pressable style={styles.vipCard} onPress={onTapBox}>
-            <View style={styles.vipIconWrap}>
-              <Svg width={28} height={28} viewBox="0 0 24 24" fill="none">
-                <Path
-                  d="M3 7.5 12 3l9 4.5v9L12 21 3 16.5v-9Z"
-                  stroke={colors.primary}
-                  strokeWidth={1.5}
-                  strokeLinejoin="round"
-                />
-                <Path d="M3 7.5 12 12l9-4.5" stroke={colors.primary} strokeWidth={1.5} strokeLinejoin="round" />
-                <Path d="M12 12v9" stroke={colors.primary} strokeWidth={1.5} />
-              </Svg>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.vipLabel}>{t('today.boxLabel')}</Text>
-              <Text style={styles.vipDate}>{format(vipShipDate, 'd MMM')}</Text>
-              <Text style={styles.vipHint}>{t('today.boxHint')}</Text>
-            </View>
-          </Pressable>
-        ) : null}
 
         {!isEmpty && showConfirmCard && !confirmJustSaved ? (
           <View style={styles.confirmCard}>
@@ -633,76 +511,6 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.text,
       fontWeight: '500',
       textAlign: 'center',
-    },
-    ctaWrap: {
-      width: '100%',
-      alignItems: 'center',
-      marginTop: 18,
-    },
-    ctaBtn: {
-      backgroundColor: colors.primary,
-      paddingVertical: 14,
-      paddingHorizontal: 28,
-      borderRadius: 999,
-      shadowColor: '#000',
-      shadowOpacity: 0.08,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 2,
-    },
-    ctaBtnText: {
-      color: colors.primaryText,
-      fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: 0.4,
-    },
-    ctaHint: {
-      marginTop: 10,
-      fontSize: 12,
-      color: colors.textMuted,
-      textAlign: 'center',
-      maxWidth: 280,
-      lineHeight: 17,
-    },
-    vipCard: {
-      marginTop: 16,
-      marginHorizontal: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      backgroundColor: colors.card,
-      borderRadius: 18,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      borderWidth: 1,
-      borderColor: colors.accent,
-    },
-    vipIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    vipLabel: {
-      color: colors.textMuted,
-      fontSize: 12,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      fontWeight: '600',
-    },
-    vipDate: {
-      color: colors.primary,
-      fontSize: 18,
-      fontWeight: '700',
-      marginTop: 2,
-      fontFamily: SERIF,
-    },
-    vipHint: {
-      color: colors.textMuted,
-      fontSize: 12,
-      marginTop: 2,
     },
     confirmCard: {
       marginTop: 16,

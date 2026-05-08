@@ -7,12 +7,16 @@ from datetime import datetime
 from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from bot.db import session_scope
 from bot.keyboards.common import multi_choice, single_choice, yes_no, confirm_keyboard
 from bot.services.admin_notify import notify_admin_full_profile
-from bot.services.cycle_code import decode_cycle_code
 from bot.services.users import get_or_create_profile, get_or_create_user
 from bot.states import Onboarding
 
@@ -120,22 +124,118 @@ def _q(text: str) -> str:
     return f"<b>{text}</b>"
 
 
+# ---- Step 0: 152-FZ consent --------------------------------------------- #
+
+
+CONSENT_TEXT = (
+    "<b>⚠️ Согласие на обработку персональных данных</b>\n\n"
+    "Прежде чем продолжить, нужно одно важное уточнение.\n\n"
+    "Чтобы собрать и привезти твой <b>персональный бокс заботы</b>, "
+    "мне нужно получить от тебя данные: имя, год рождения, город и адрес "
+    "доставки, телефон, особенности цикла, аллергии, предпочтения по "
+    "уходу и питанию.\n\n"
+    "<b>Эти данные используются ТОЛЬКО для:</b>\n"
+    "• подбора содержимого бокса под тебя;\n"
+    "• формирования и доставки бокса курьером;\n"
+    "• напоминаний о датах в этом боте.\n\n"
+    "Я <b>не передаю</b> их третьим лицам и не использую для рекламы или "
+    "перепродажи.\n\n"
+    "Нажимая «Согласна, продолжить», ты подтверждаешь, что тебе "
+    "<b>есть 18 лет</b>, и даёшь согласие на обработку своих "
+    "персональных данных в соответствии с Федеральным законом "
+    "№ 152-ФЗ «О персональных данных» — на цели, описанные выше.\n\n"
+    "Согласие можно отозвать в любой момент, написав <code>/cancel</code>."
+)
+
+
+def _consent_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Согласна, продолжить",
+                    callback_data="consent:accept",
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text="❌ Не сейчас",
+                    callback_data="consent:decline",
+                )
+            ],
+        ]
+    )
+
+
+async def _show_consent(target, state: FSMContext) -> None:
+    await state.set_state(Onboarding.consent)
+    if isinstance(target, CallbackQuery):
+        await target.message.answer(
+            CONSENT_TEXT, parse_mode="HTML", reply_markup=_consent_keyboard()
+        )
+    else:
+        await target.answer(
+            CONSENT_TEXT, parse_mode="HTML", reply_markup=_consent_keyboard()
+        )
+
+
 # ---- Step 1: basic ------------------------------------------------------ #
 
 
 @router.callback_query(F.data == "onboarding:start")
 async def begin(cb: CallbackQuery, state: FSMContext) -> None:
     await _ensure_profile(cb)
-    await state.set_state(Onboarding.name)
-    await cb.message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await _show_consent(cb, state)
     await cb.answer()
 
 
 @router.message(Command("setup"))
 async def begin_via_command(message: Message, state: FSMContext) -> None:
     await _ensure_profile(message)
+    await _show_consent(message, state)
+
+
+@router.callback_query(Onboarding.consent, F.data == "consent:accept")
+async def consent_accept(cb: CallbackQuery, state: FSMContext) -> None:
+    await _save_consent(cb)
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.message.answer(
+        "Спасибо! Поехали 💛", parse_mode="HTML"
+    )
     await state.set_state(Onboarding.name)
-    await message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await cb.message.answer(_q("Шаг 1/7. Как тебя зовут?"), parse_mode="HTML")
+    await cb.answer()
+
+
+async def _save_consent(event) -> None:
+    """Persist 152-FZ consent fact + timestamp to Profile.extra."""
+    user_tg = event.from_user
+    async with session_scope() as session:
+        user = await get_or_create_user(session, user_tg)
+        profile = await get_or_create_profile(session, user)
+        extra = dict(profile.extra or {})
+        extra["consent_personal_data"] = True
+        extra["consent_at"] = datetime.utcnow().isoformat() + "Z"
+        profile.extra = extra
+
+
+@router.callback_query(Onboarding.consent, F.data == "consent:decline")
+async def consent_decline(cb: CallbackQuery, state: FSMContext) -> None:
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.message.answer(
+        "Поняла. Без согласия на обработку данных я, к сожалению, "
+        "не смогу собрать и доставить бокс. Если передумаешь — нажми "
+        "<code>/setup</code> или вернись в меню через <code>/start</code>.",
+        parse_mode="HTML",
+    )
+    await state.clear()
+    await cb.answer()
 
 
 @router.message(Onboarding.name)
@@ -172,60 +272,9 @@ async def step_city(message: Message, state: FSMContext) -> None:
         await message.answer("Город текстом, пожалуйста.")
         return
     await _save_field(message, city=city)
-    await state.set_state(Onboarding.flow_code_choice)
-    await message.answer(
-        _q("У тебя уже есть код синхронизации цикла из приложения Lira?"),
-        parse_mode="HTML",
-        reply_markup=yes_no(skip=True),
-    )
-
-
-@router.callback_query(Onboarding.flow_code_choice, F.data.in_({"yes", "no", "nav:skip"}))
-async def step_flow_choice(cb: CallbackQuery, state: FSMContext) -> None:
-    if cb.data == "yes":
-        await state.set_state(Onboarding.flow_code_input)
-        await cb.message.answer(
-            "Пришли код из приложения (8 символов, например <code>4FGA-9XPP</code>).",
-            parse_mode="HTML",
-        )
-    else:
-        await state.set_state(Onboarding.cycle_length)
-        await cb.message.answer(
-            _q("Ок, тогда уточню. Какая средняя длина цикла? (число дней, например 28)"),
-            parse_mode="HTML",
-        )
-    await cb.answer()
-
-
-@router.message(Onboarding.flow_code_input)
-async def step_flow_code(message: Message, state: FSMContext) -> None:
-    raw = (message.text or "").strip()
-    payload = decode_cycle_code(raw)
-    if payload is not None:
-        # Valid sync code → skip cycle/period questions and jump to step 2.
-        await _save_field(
-            message,
-            flow_app_code=raw.upper(),
-            cycle_sync_code=raw.upper(),
-            last_period_start=payload.start_date,
-            cycle_length_days=payload.cycle_length,
-            period_length_days=payload.period_length,
-        )
-        await message.answer(
-            "Отлично, цикл синхронизирован 💫\n"
-            f"• Последние месячные: <b>{payload.start_date:%d.%m.%Y}</b>\n"
-            f"• Длина цикла: <b>{payload.cycle_length} дн.</b>\n"
-            f"• Длина месячных: <b>{payload.period_length} дн.</b>",
-            parse_mode="HTML",
-        )
-        await _start_step2(message, state)
-        return
-    # Не код синхронизации — старое поведение (просто сохраним как app code и
-    # уточним длины вручную).
-    await _save_field(message, flow_app_code=raw.upper())
     await state.set_state(Onboarding.cycle_length)
     await message.answer(
-        _q("Спасибо! Ещё уточни — какая средняя длина цикла? (число дней, например 28)"),
+        _q("Какая средняя длина цикла? (число дней, например 28)"),
         parse_mode="HTML",
     )
 
@@ -665,17 +714,19 @@ async def _save_address(message: Message, state: FSMContext, field: str) -> None
             await notify_admin_full_profile(
                 message.bot, message.from_user, profile
             )
-        # Step 7
+        # Step 7 — if a tariff was preselected from the welcome menu we go
+        # straight to invoice; otherwise show the legacy tariff picker.
         await state.set_state(Onboarding.tariff)
-        await _show_tariffs(message)
+        await _show_tariffs(message, state)
 
 
 # ---- Step 7: tariff selection — defers to payment.py ------------------- #
 
 
-async def _show_tariffs(message: Message) -> None:
+async def _show_tariffs(message: Message, state: FSMContext | None = None) -> None:
     from bot.handlers.payment import show_tariffs  # local import to avoid cycle
-    await show_tariffs(message)
+
+    await show_tariffs(message, state)
 
 
 # ---- Helpers ------------------------------------------------------------ #

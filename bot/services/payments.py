@@ -1,4 +1,4 @@
-"""Telegram Payments helpers + activation completion."""
+"""Telegram Payments helpers + payment completion."""
 from __future__ import annotations
 
 import logging
@@ -9,28 +9,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.config import get_settings
 from bot.models import Order, OrderStatus, Tariff, User
-from bot.services.codes import issue_code
 from bot.services.subscriptions import create_subscription
 
 log = logging.getLogger(__name__)
 
 TARIFF_META: dict[Tariff, dict] = {
     Tariff.PREMIUM: {
-        "title": "Lira Premium — 199₽/мес",
+        "title": "Премиум — 199 ₽/мес",
+        "short": "Премиум",
         "description": "Цифровой тариф: расширенная аналитика, прогноз "
-        "овуляции, экспорт PDF/CSV, гайды. Без бокса.",
+        "овуляции, экспорт PDF/CSV, гайды. Без бокса и без опросника.",
         "price": 199,
+        "needs_onboarding": False,
     },
     Tariff.BASIC: {
-        "title": "Базовый бокс — 999₽/мес",
-        "description": "До 5 предметов: гигиена, шоколад, уход. Каждый месяц.",
+        "title": "Твой ритм — 999 ₽/мес",
+        "short": "Твой ритм",
+        "description": "Бокс заботы каждый месяц: до 5 предметов — гигиена, "
+        "шоколад, средство ухода. Подбор под твой профиль.",
         "price": 999,
+        "needs_onboarding": True,
     },
     Tariff.VIP: {
-        "title": "VIP бокс — 1999₽/мес",
-        "description": "До 8 предметов + сюрприз: органика, шоколад ручной "
-        "работы, 3 средства ухода, чай и гайды.",
+        "title": "Полная симфония — 1999 ₽/мес",
+        "short": "Полная симфония",
+        "description": "Расширенный бокс: до 8 предметов + сюрприз — органика, "
+        "шоколад ручной работы, 3 средства ухода, чай, гайды.",
         "price": 1999,
+        "needs_onboarding": True,
     },
 }
 
@@ -65,15 +71,12 @@ async def finalize_payment(
     tariff: Tariff,
     payment_id: str,
     amount_rub: int,
-) -> tuple[Order, str]:
-    """Persist Order, create Subscription, issue activation code.
-
-    Returns (order, activation_code_value).
-    """
+) -> Order:
+    """Persist Order + create Subscription. The app reads the resulting
+    subscription state via the bot→app sync flow (no activation codes)."""
     sub = await create_subscription(
         session, user=user, tariff=tariff, payment_id=payment_id
     )
-    code = await issue_code(session, user=user, subscription=sub)
     order = Order(
         user_id=user.id,
         subscription_id=sub.id,
@@ -82,8 +85,8 @@ async def finalize_payment(
         payment_provider="telegram",
         provider_payment_id=payment_id,
         paid_at=sub.started_at,
-        snapshot={"tariff": tariff.value, "code": code.code},
+        snapshot={"tariff": tariff.value},
     )
     session.add(order)
     await session.flush()
-    return order, code.code
+    return order

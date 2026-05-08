@@ -29,6 +29,7 @@ class Settings(BaseSettings):
 
     # Telegram
     bot_token: str = Field(..., alias="BOT_TOKEN")
+    bot_username: OptionalStr = Field(default="lowerBsk24_bot", alias="BOT_USERNAME")
     admin_chat_id: OptionalInt = Field(default=None, alias="ADMIN_CHAT_ID")
     assembly_chat_id: OptionalInt = Field(default=None, alias="ASSEMBLY_CHAT_ID")
     payment_provider_token: OptionalStr = Field(

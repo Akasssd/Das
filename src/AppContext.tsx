@@ -299,10 +299,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     data.settings,
   ]);
 
-  // Subscription is now activated locally via Telegram-bot-issued codes
-  // (see src/utils/activation.ts); shipping/orders are tracked by the bot,
-  // so the app no longer reconciles BoxOrders here. Auto-expiry on cold
-  // start is handled in storage.ts:normalize().
+  // Subscription is mirrored from the Telegram bot via the one-way sync
+  // pull (see src/hooks/useTelegramSync.ts); shipping/orders are tracked
+  // by the bot, so the app no longer reconciles BoxOrders here. Auto-
+  // expiry on cold start is handled in storage.ts:normalize().
 
   const value = useMemo<AppContextValue>(
     () => ({

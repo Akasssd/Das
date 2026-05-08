@@ -7,6 +7,7 @@
     "calendar": "Календарь",
     "analytics": "Аналитика",
     "history": "История",
+    "lira": "Лира",
     "stats": "Статистика",
     "subscription": "Подписка",
     "settings": "Настройки"
@@ -175,7 +176,21 @@
     "symptomsTitle": "Частые симптомы",
     "symptomsHint": "Добавь симптомы в дневник, чтобы видеть разбивку.",
     "insufficientData": "Недостаточно данных.",
-    "days": "дн."
+    "days": "дн.",
+    "cycleTrendsTitle": "Тренды цикла",
+    "cycleTrendsHint": "Каждый ряд — один цикл. Точки сгруппированы по фазам — месячные, фертильное окно и овуляция.",
+    "currentCycle": "Текущий цикл",
+    "regularity": "Регулярность",
+    "regularStable": "Стабильный",
+    "regularVariable": "Переменчивый",
+    "regularLearning": "Учусь у тебя",
+    "regularityHintStable": "Циклы за последние месяцы укладываются в 7 дней — прогноз надёжный.",
+    "regularityHintVariable": "Разница между циклами больше 7 дней. Прогноз приблизительный — продолжай отмечать.",
+    "regularityHintLearning": "Нужно ещё пара циклов, чтобы посчитать средние. Пока используем настройки.",
+    "phaseLegendPeriod": "Месячные",
+    "phaseLegendFertile": "Фертильное окно",
+    "phaseLegendOvulation": "Овуляция",
+    "currentDay": "День {{n}}"
   },
   "history": {
     "title": "История циклов",
