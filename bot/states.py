@@ -11,8 +11,6 @@ class Onboarding(StatesGroup):
     name = State()
     birth_year = State()
     city = State()
-    flow_code_choice = State()
-    flow_code_input = State()
     cycle_length = State()
     period_length = State()
 
