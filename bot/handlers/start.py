@@ -80,6 +80,44 @@ async def on_start_premium(message: Message, state: FSMContext) -> None:
     await start_premium_flow(message, state)
 
 
+@router.message(CommandStart(deep_link=True), F.text.regexp(r"^/start\s+basic\b"))
+async def on_start_basic(message: Message, state: FSMContext) -> None:
+    """Deep link from the app: tariff is preselected as Basic → consent → questionnaire → invoice."""
+    await state.clear()
+    if message.from_user is not None:
+        async with session_scope() as session:
+            await get_or_create_user(session, message.from_user)
+    from bot.handlers.payment import _start_box_flow
+    from bot.models import Tariff
+
+    await _start_box_flow(message, state, Tariff.BASIC)
+
+
+@router.message(CommandStart(deep_link=True), F.text.regexp(r"^/start\s+vip\b"))
+async def on_start_vip(message: Message, state: FSMContext) -> None:
+    """Deep link from the app: tariff is preselected as VIP → consent → questionnaire → invoice."""
+    await state.clear()
+    if message.from_user is not None:
+        async with session_scope() as session:
+            await get_or_create_user(session, message.from_user)
+    from bot.handlers.payment import _start_box_flow
+    from bot.models import Tariff
+
+    await _start_box_flow(message, state, Tariff.VIP)
+
+
+@router.message(CommandStart(deep_link=True), F.text.regexp(r"^/start\s+mybox\b"))
+async def on_start_mybox(message: Message, state: FSMContext) -> None:
+    """Deep link from the app: jump straight to the personal cabinet (subscription status)."""
+    await state.clear()
+    if message.from_user is not None:
+        async with session_scope() as session:
+            await get_or_create_user(session, message.from_user)
+    from bot.handlers.cabinet import _render_status
+
+    await _render_status(message)
+
+
 @router.message(CommandStart())
 async def on_start(message: Message, state: FSMContext) -> None:
     await state.clear()
