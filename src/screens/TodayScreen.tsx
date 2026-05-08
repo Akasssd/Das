@@ -8,18 +8,33 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path, Circle as SvgCircle } from 'react-native-svg';
-import { format } from 'date-fns';
+import Svg, { Path, Circle as SvgCircle, Rect } from 'react-native-svg';
+import { addDays, format, parseISO } from 'date-fns';
 import { useApp } from '../AppContext';
 import { tArray } from '../i18n';
 import {
   buildPhaseSegments,
   CyclePhase,
+  fertileWindowInfo,
   phaseForCycleDay,
 } from '../cycle';
 import { ThemeColors } from '../theme';
 import { PhaseRing } from '../components/PhaseRing';
 import { WaveBackground } from '../components/WaveBackground';
+
+const ruDayWord = (n: number): string => {
+  const a = Math.abs(n) % 100;
+  const b = a % 10;
+  if (a > 10 && a < 20) return 'дней';
+  if (b > 1 && b < 5) return 'дня';
+  if (b === 1) return 'день';
+  return 'дней';
+};
+
+const formatDays = (n: number, language: string): string => {
+  if (language === 'ru') return `${n} ${ruDayWord(n)}`;
+  return n === 1 ? `${n} day` : `${n} days`;
+};
 
 const SERIF =
   // Stack of warm, elegant serifs that work on iOS, Android and the web build.
@@ -85,6 +100,47 @@ const DropIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
   </Svg>
 );
 
+const HeartIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
+  size,
+  colors,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Path
+      d="M32 56 C 32 56 8 40 8 24 C 8 14 16 8 24 8 C 28 8 30 10 32 14 C 34 10 36 8 40 8 C 48 8 56 14 56 24 C 56 40 32 56 32 56 Z"
+      fill={colors.fertile}
+      stroke={colors.primary}
+      strokeWidth={2}
+    />
+  </Svg>
+);
+
+const CalendarIcon: React.FC<{ size: number; colors: ThemeColors }> = ({
+  size,
+  colors,
+}) => (
+  <Svg width={size} height={size} viewBox="0 0 64 64">
+    <Rect
+      x={8}
+      y={14}
+      width={48}
+      height={42}
+      rx={6}
+      fill={colors.card}
+      stroke={colors.primary}
+      strokeWidth={2}
+    />
+    <Rect x={8} y={14} width={48} height={10} rx={6} fill={colors.fertile} />
+    <Rect x={18} y={6} width={4} height={12} rx={2} fill={colors.primary} />
+    <Rect x={42} y={6} width={4} height={12} rx={2} fill={colors.primary} />
+    <Rect x={16} y={30} width={8} height={6} rx={1.5} fill={colors.fertile} />
+    <Rect x={28} y={30} width={8} height={6} rx={1.5} fill={colors.fertile} />
+    <Rect x={40} y={30} width={8} height={6} rx={1.5} fill={colors.fertile} />
+    <Rect x={16} y={40} width={8} height={6} rx={1.5} fill={colors.fertile} />
+    <Rect x={28} y={40} width={8} height={6} rx={1.5} fill={colors.primary} />
+    <Rect x={40} y={40} width={8} height={6} rx={1.5} fill={colors.fertile} />
+  </Svg>
+);
+
 export const TodayScreen: React.FC = () => {
   const { data, predictions, colors, t, language, upsertLogs } = useApp();
   const { width } = useWindowDimensions();
@@ -144,6 +200,8 @@ export const TodayScreen: React.FC = () => {
   const monthsGen = tArray('monthsGenitive');
   const dateStr = formatDayMonth(today, monthsGen);
 
+  const fertile = fertileWindowInfo(cycleDay, segments);
+
   const ringSize = Math.min(width - 80, 260);
 
   const renderCenter = () => {
@@ -162,11 +220,62 @@ export const TodayScreen: React.FC = () => {
     );
   };
 
+  const untilPeriodValue = (() => {
+    const days = predictions.daysUntilNextPeriod;
+    if (days === null) return '—';
+    if (days === 0) return t('today.cardUntilPeriodNow');
+    if (days < 0) {
+      return language === 'ru'
+        ? `Задержка ${formatDays(Math.abs(days), 'ru')}`
+        : `Late ${formatDays(Math.abs(days), 'en')}`;
+    }
+    return formatDays(days, language);
+  })();
+
+  const fertileValue = (() => {
+    if (predictions.lastPeriodStart === null) return '—';
+    if (fertile.isInside) {
+      return formatDays(fertile.remaining, language);
+    }
+    if (fertile.total === 0) return '—';
+    if (cycleDay !== null) {
+      const nextStart = predictions.fertileStart
+        ? parseISO(predictions.fertileStart)
+        : null;
+      if (nextStart) {
+        const diff = Math.ceil(
+          (nextStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+        );
+        if (diff > 0) {
+          return language === 'ru'
+            ? `через ${formatDays(diff, 'ru')}`
+            : `in ${formatDays(diff, 'en')}`;
+        }
+      }
+      return t('today.fertileEnded');
+    }
+    return formatDays(fertile.total, language);
+  })();
+
+  const nextOvulationValue = (() => {
+    if (!predictions.ovulation) return '—';
+    const ovDate = parseISO(predictions.ovulation);
+    let target = ovDate;
+    if (target.getTime() < today.getTime() - 1000 * 60 * 60 * 24) {
+      target = addDays(target, cycleLen);
+    }
+    return formatDayMonth(target, monthsGen);
+  })();
+
   const isEmpty = !predictions.lastPeriodStart;
   const showCycleDay = !isEmpty && cycleDay !== null;
   const phaseText = isEmpty
     ? t('today.placeholderPhase')
     : t(phaseTitleKey(phase));
+  const dash = t('today.placeholderValue');
+  const cardUntil = isEmpty ? dash : untilPeriodValue;
+  const cardFertile = isEmpty ? dash : fertileValue;
+  const cardOvulation = isEmpty ? dash : nextOvulationValue;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -208,6 +317,30 @@ export const TodayScreen: React.FC = () => {
           </PhaseRing>
         </View>
 
+        <View style={styles.cards}>
+          <InfoCard
+            colors={colors}
+            icon={<DropIcon size={28} colors={colors} />}
+            label={t('today.cardUntilPeriod')}
+            value={cardUntil}
+            serif={SERIF}
+          />
+          <InfoCard
+            colors={colors}
+            icon={<HeartIcon size={28} colors={colors} />}
+            label={t('today.cardFertileWindow')}
+            value={cardFertile}
+            serif={SERIF}
+          />
+          <InfoCard
+            colors={colors}
+            icon={<CalendarIcon size={28} colors={colors} />}
+            label={t('today.cardNextOvulation')}
+            value={cardOvulation}
+            serif={SERIF}
+          />
+        </View>
+
         {!isEmpty && showConfirmCard && !confirmJustSaved ? (
           <View style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>{t('today.confirmTitle')}</Text>
@@ -247,6 +380,27 @@ export const TodayScreen: React.FC = () => {
         <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+};
+
+const InfoCard: React.FC<{
+  colors: ThemeColors;
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  serif: string;
+}> = ({ colors, icon, label, value, serif }) => {
+  const styles = makeStyles(colors);
+  return (
+    <View style={styles.infoCard}>
+      <View style={styles.infoIcon}>{icon}</View>
+      <Text style={styles.infoLabel} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.infoValue, { fontFamily: serif }]} numberOfLines={1}>
+        {value}
+      </Text>
+    </View>
   );
 };
 
@@ -322,6 +476,41 @@ const makeStyles = (colors: ThemeColors) =>
       color: colors.textMuted,
       textAlign: 'center',
       letterSpacing: 0.4,
+    },
+    cards: {
+      flexDirection: 'row',
+      width: '100%',
+      marginTop: 12,
+    },
+    infoCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 18,
+      paddingVertical: 14,
+      paddingHorizontal: 10,
+      marginHorizontal: 4,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 2,
+    },
+    infoIcon: {
+      marginBottom: 6,
+    },
+    infoLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+      letterSpacing: 0.3,
+      textAlign: 'center',
+      marginBottom: 4,
+    },
+    infoValue: {
+      fontSize: 18,
+      color: colors.text,
+      fontWeight: '500',
+      textAlign: 'center',
     },
     confirmCard: {
       marginTop: 16,
