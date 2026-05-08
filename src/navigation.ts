@@ -10,4 +10,5 @@ export type RootStackParamList = {
   CycleWizard: undefined;
   Subscription: undefined;
   ManageSubscription: undefined;
+  Lira: undefined;
 };

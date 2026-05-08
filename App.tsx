@@ -20,6 +20,7 @@ import { OnboardingScreen } from './src/screens/OnboardingScreen';
 import { LockScreen } from './src/screens/LockScreen';
 import { SubscriptionScreen } from './src/screens/SubscriptionScreen';
 import { ManageSubscriptionScreen } from './src/screens/ManageSubscriptionScreen';
+import { LiraChatScreen } from './src/screens/LiraChatScreen';
 import { RootStackParamList } from './src/navigation';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -74,6 +75,20 @@ const SettingsIcon: React.FC<{ color: string; size: number }> = ({ color, size }
       strokeWidth={1.3}
       strokeLinejoin="round"
     />
+  </Svg>
+);
+
+const LiraTabIcon: React.FC<{ color: string; size: number }> = ({ color, size }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M5 5h12a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H10l-4 3v-3H5a3 3 0 0 1-3-3V8a3 3 0 0 1 3-3Z"
+      stroke={color}
+      strokeWidth={1.5}
+      strokeLinejoin="round"
+    />
+    <Circle cx={9} cy={11} r={1.1} fill={color} />
+    <Circle cx={13} cy={11} r={1.1} fill={color} />
+    <Circle cx={17} cy={11} r={1.1} fill={color} />
   </Svg>
 );
 
@@ -153,6 +168,14 @@ const Tabs: React.FC = () => {
           tabBarIcon: ({ color, size }) => (
             <HistoryIcon color={color} size={size} />
           ),
+        }}
+      />
+      <Tab.Screen
+        name="Lira"
+        component={LiraChatScreen}
+        options={{
+          title: t('tabs.lira'),
+          tabBarIcon: ({ color, size }) => <LiraTabIcon color={color} size={size} />,
         }}
       />
       <Tab.Screen
